@@ -2,15 +2,42 @@
 #include "config/device_config.h"
 
 YDLidarDriver::YDLidarDriver(HardwareSerial* serial)
-    : _lidar(serial)  // library stores the pointer and calls begin() itself
+    : _lidar(serial, GS_LIDAR_BAUDRATE_921600)
+    , _serial(serial)
     , _ready(false) {}
 
+// GS2 keeps state across Teensy reflash (no reset line). The library's
+// initialize() pings and expects a clean reply, but leftover scan frames
+// from the previous session swallow the ping. Mitigation from qB_Test_TOF:
+//   1. Open the serial port ourselves and drain ~1 s of stale RX.
+//   2. Retry initialize() with inter-attempt drains.
+// Permanent fix (not yet wired): a GPIO-controlled low-side N-MOSFET on the
+// lidar GND so we can actually power-cycle it at boot.
 bool YDLidarDriver::begin() {
-    GS_error status = _lidar.initialize(LIDAR_SENSOR_COUNT);
+    _serial->begin(921600);
+
+    // Drain 1 s of any mid-scan leftovers from a previous session.
+    uint32_t drainStart = millis();
+    while (millis() - drainStart < 1000) {
+        while (_serial->available()) _serial->read();
+    }
+
+    // Retry initialize() a few times, draining between attempts.
+    GS_error status = GS_NOT_OK;
+    for (int attempt = 0; attempt < 5; attempt++) {
+        status = _lidar.initialize();
+        if (status == GS_OK) break;
+
+        uint32_t t0 = millis();
+        while (millis() - t0 < 500) {
+            while (_serial->available()) _serial->read();
+        }
+    }
     if (status != GS_OK) {
         _ready = false;
         return false;
     }
+
     status = _lidar.startScanning();
     _ready = (status == GS_OK);
     return _ready;
@@ -19,7 +46,7 @@ bool YDLidarDriver::begin() {
 bool YDLidarDriver::update(LidarSectors& sectors) {
     if (!_ready) return false;
 
-    iter_Scan scan = _lidar.iter_scans(0x01);  // device address 1
+    iter_Scan scan = _lidar.iter_scans(GS_LIDAR_ADDRESS_1);
 
     // Init to "no obstacle" (max uint16)
     sectors.front_mm = UINT16_MAX;
@@ -35,7 +62,7 @@ bool YDLidarDriver::update(LidarSectors& sectors) {
     //   Right:  45–135
     //   Back:   135–225
     //   Left:   225–315
-    for (int i = 0; i < MAX_SCAN; i++) {
+    for (int i = 0; i < SCANS_PER_CYCLE; i++) {
         if (!scan.valid[i]) continue;
         if (scan.distance[i] == 0) continue;
 

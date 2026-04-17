@@ -27,8 +27,9 @@ static constexpr uint8_t LIDAR_BIN_COUNT = 36;
 
 class YDLidarDriver {
 public:
-    // serial: hardware UART wired to the GS2
-    //   NOTE: do NOT call serial->begin() — the library does it internally.
+    // serial: hardware UART wired to the GS2. This driver calls
+    // serial->begin(921600) itself so it can drain pre-existing RX data
+    // before letting the library ping.
     explicit YDLidarDriver(HardwareSerial* serial);
 
     // Initialise and start scanning.  Returns true on success.
@@ -43,6 +44,7 @@ public:
     bool isReady() const { return _ready; }
 
 private:
-    YDLiDar_GS2 _lidar;
-    bool        _ready;
+    YDLiDar_GS2     _lidar;
+    HardwareSerial* _serial;   // same pointer handed to the library
+    bool            _ready;
 };
