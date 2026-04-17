@@ -40,15 +40,18 @@ static const uint8_t SERVO_IDS[SERVO_COUNT] = {
     SERVO_ID_LEG_FL, SERVO_ID_LEG_FR, SERVO_ID_LEG_BL, SERVO_ID_LEG_BR
 };
 
-// --- VL53L0X TOF Sensors (I2C) ---
-// Default out-of-box address is 0x29; we reassign during init.
-#define TOF_DEFAULT_ADDR        0x29
-#define TOF_ADDR_LEFT           0x30
-#define TOF_ADDR_RIGHT          0x31
-#define TOF_ADDR_BACK           0x32
+// --- VL53L0X TOF Sensor (I2C via Wire2) ---
+// Single sensor at default I2C address 0x29. DFRobot library convention
+// takes the 8-bit form (0x52 = 0x29 << 1). No address reassignment needed
+// since only one sensor is on Wire2.
+#define TOF_DEFAULT_ADDR_7BIT   0x29
+#define TOF_DEFAULT_ADDR_8BIT   0x52
+#define TOF_I2C_CLOCK_HZ        100000  // 100 kHz — matches qB_Test_TOF
 
-// --- BNO055 IMU (I2C) ---
-#define BNO055_I2C_ADDR         0x28   // AD0 LOW → 0x28, HIGH → 0x29
+// --- MPU6050 IMU (I2C via Wire) ---
+// AD0 pin low/floating → 0x68, high → 0x69.
+#define MPU6050_I2C_ADDR        0x68
+#define MPU6050_I2C_CLOCK_HZ    100000  // 100 kHz — matches qB_Test_TOF
 
 // --- YDLidar GS2 (UART @ 921600 baud, handled internally by library) ---
 // The library calls Serial.begin() itself — do NOT pre-init the port.

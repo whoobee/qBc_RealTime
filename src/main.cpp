@@ -10,6 +10,7 @@
 #include <HeliOS_Arduino.h>
 
 #include "config/feature_config.h"
+#include "config/device_config.h"
 #include "system/shared_state.h"
 #include "debug/debug_comm.h"
 
@@ -42,10 +43,16 @@ void setup() {
 
     debug_comm_init();
 
-    // ---- Shared I2C bus (only needed if I2C devices are enabled) ----
-#if FEATURE_IMU_ENABLED || FEATURE_TOF_ENABLED
+    // ---- I2C buses ----
+    // MPU6050 IMU → Wire (SDA=18, SCL=19)
+    // VL53L0X TOF → Wire2 (SDA2=25, SCL2=24) via DFRobot fork
+#if FEATURE_IMU_ENABLED
     Wire.begin();
-    Wire.setClock(400000);
+    Wire.setClock(MPU6050_I2C_CLOCK_HZ);
+#endif
+#if FEATURE_TOF_ENABLED
+    Wire2.begin();
+    Wire2.setClock(TOF_I2C_CLOCK_HZ);
 #endif
 
     shared_state_init();

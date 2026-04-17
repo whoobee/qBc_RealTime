@@ -54,6 +54,7 @@ void task_perception_init() {
 #endif
 
 #if FEATURE_TOF_ENABLED
+    // Wire2.begin() is called from main.cpp — DFRobot fork speaks on Wire2.
     s_tofs.begin();
     g_monitorData.sensor_ok_tof[0] = s_tofs.isReady(VL53L0XArray::LEFT);
     g_monitorData.sensor_ok_tof[1] = s_tofs.isReady(VL53L0XArray::RIGHT);

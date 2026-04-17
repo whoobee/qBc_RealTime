@@ -4,14 +4,14 @@
 #include "config/feature_config.h"
 
 #if FEATURE_IMU_ENABLED
-#include "drivers/bno055_imu.h"
+#include "drivers/mpu6050_imu.h"
 #include <cmath>
 
 static constexpr float WHEEL_CIRCUMF_MM = 204.2f;
 static constexpr float MM_PER_REV       = WHEEL_CIRCUMF_MM;
 
-static BNO055IMU s_imu;
-static bool      s_imuOk = false;
+static MPU6050IMU s_imu;
+static bool       s_imuOk = false;
 
 static void stateEstimationCallback(TaskId_t id_) {
     if (!s_imuOk) return;
