@@ -26,6 +26,9 @@ bool YDLidarDriver::update(LidarSectors& sectors) {
     sectors.right_mm = UINT16_MAX;
     sectors.back_mm  = UINT16_MAX;
     sectors.left_mm  = UINT16_MAX;
+    for (uint8_t b = 0; b < LIDAR_BIN_COUNT; b++) {
+        sectors.bins[b] = UINT16_MAX;
+    }
 
     // Sector definitions (degrees, measured CCW from front):
     //   Front:  315–360 and 0–45
@@ -43,6 +46,7 @@ bool YDLidarDriver::update(LidarSectors& sectors) {
         while (angle < 0.0)   angle += 360.0;
         while (angle >= 360.0) angle -= 360.0;
 
+        // 4-sector map (kept for safety/navigation legacy consumers)
         if (angle >= 315.0 || angle < 45.0) {
             if (dist < sectors.front_mm) sectors.front_mm = dist;
         } else if (angle >= 45.0 && angle < 135.0) {
@@ -52,6 +56,11 @@ bool YDLidarDriver::update(LidarSectors& sectors) {
         } else {
             if (dist < sectors.left_mm)  sectors.left_mm  = dist;
         }
+
+        // Fine 36-bin polar histogram (10 deg per bin)
+        uint8_t bin = (uint8_t)(angle / 10.0);
+        if (bin >= LIDAR_BIN_COUNT) bin = LIDAR_BIN_COUNT - 1;
+        if (dist < sectors.bins[bin]) sectors.bins[bin] = dist;
     }
 
     // Replace "no obstacle" marker with 0 (means sensor saw nothing in range)
@@ -59,6 +68,9 @@ bool YDLidarDriver::update(LidarSectors& sectors) {
     if (sectors.right_mm == UINT16_MAX) sectors.right_mm = 0;
     if (sectors.back_mm  == UINT16_MAX) sectors.back_mm  = 0;
     if (sectors.left_mm  == UINT16_MAX) sectors.left_mm  = 0;
+    for (uint8_t b = 0; b < LIDAR_BIN_COUNT; b++) {
+        if (sectors.bins[b] == UINT16_MAX) sectors.bins[b] = 0;
+    }
 
     sectors.timestamp_ms = millis();
     return true;

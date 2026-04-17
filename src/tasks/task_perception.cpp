@@ -36,6 +36,9 @@ static void perceptionCallback(TaskId_t id_) {
             g_perceptionData.lidar_min_left_mm  = sectors.left_mm;
             g_perceptionData.lidar_min_right_mm = sectors.right_mm;
             g_perceptionData.lidar_min_back_mm  = sectors.back_mm;
+            for (uint8_t b = 0; b < LIDAR_BIN_COUNT; b++) {
+                g_perceptionData.lidar_bins[b] = sectors.bins[b];
+            }
         }
     }
 #endif

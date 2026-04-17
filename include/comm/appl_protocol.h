@@ -132,6 +132,12 @@ enum ApplParam : uint8_t {
     PARAM_SAFETY_STATUS     = 0x40,  // Bitmask of SAFETY_* bits
     PARAM_HEARTBEAT         = 0x41,  // Pi → Teensy keepalive
     PARAM_FAULT_CODE        = 0x42,
+
+    // Lidar polar histogram — 36 bins × 10° covering 0..360° CCW from front.
+    // Encoded as param = PARAM_LIDAR_BIN_0 + bin_index, value = min distance (mm, float).
+    // Bin i covers angles [i*10, i*10+10).
+    PARAM_LIDAR_BIN_0       = 0x80,
+    PARAM_LIDAR_BIN_35      = 0xA3,  // inclusive upper bound
 };
 
 // ---- Error codes (byte 10 in ResponsePacket) --------------------------------

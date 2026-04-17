@@ -72,6 +72,10 @@ struct PerceptionData {
     uint16_t lidar_min_left_mm;
     uint16_t lidar_min_right_mm;
     uint16_t lidar_min_back_mm;
+    // Full 360 deg polar histogram, 10 deg resolution.
+    // bin[i] holds the min distance (mm) seen in sector [i*10, i*10+10), CCW from front.
+    // 0 = no valid return in that sector.
+    uint16_t lidar_bins[36];
     uint32_t timestamp_ms;
 };
 

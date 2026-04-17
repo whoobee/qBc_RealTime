@@ -17,8 +17,13 @@ struct LidarSectors {
     uint16_t right_mm;   // min distance in right sector
     uint16_t back_mm;    // min distance in back sector
     uint16_t left_mm;    // min distance in left sector
+    // Full 36-bin polar histogram (10 deg per bin, CCW from front).
+    // 0 = no valid return in that sector.
+    uint16_t bins[36];
     uint32_t timestamp_ms;
 };
+
+static constexpr uint8_t LIDAR_BIN_COUNT = 36;
 
 class YDLidarDriver {
 public:
