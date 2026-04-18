@@ -9,7 +9,7 @@
 //   Serial1 — Raspberry Pi     (TX=1,  RX=0)
 //   Serial2 — ST3215 servos    (TX=8,  RX=7)
 //   Serial3 — DDSM210 Motor R  (TX=14, RX=15)
-//   Serial5 — DDSM210 Motor L  (TX=20, RX=21)
+//   Serial4 — DDSM210 Motor L  (TX=17, RX=16)
 //   Serial7 — YDLidar GS2      (TX=29, RX=28)  — 921600 baud, 8N1
 //
 // I2C buses (validated in qB_Test_TOF):
@@ -21,7 +21,7 @@
 #define SERIAL_PI            Serial1   // RPi ↔ Teensy (COBS / PacketSerial)
 #define SERIAL_SERVOS        Serial2   // ST3215 servo bus
 #define SERIAL_MOTOR_RIGHT   Serial3   // DDSM210 — dedicated port per motor
-#define SERIAL_MOTOR_LEFT    Serial5   // DDSM210
+#define SERIAL_MOTOR_LEFT    Serial4   // DDSM210
 #define SERIAL_LIDAR         Serial7   // YDLidar GS2 (pins 28/29, 921600 baud)
 #define SERIAL_DEBUG         Serial    // USB serial for debug logging
 

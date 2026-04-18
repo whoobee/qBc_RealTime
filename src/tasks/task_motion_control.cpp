@@ -65,16 +65,11 @@ static ResponsePacket handleRequest(const RequestPacket& req,
             dev == GRP_ALL_WHEELS) {
 
             float scaled = val * safety.speedScaleFactor();
-            MotorCommand mcmd = {};
 
-            if (dev == GRP_ALL_WHEELS) {
-                mcmd.left_rpm  = scaled;
-                mcmd.right_rpm = scaled;
-            } else {
-                if (dev == DEV_WHEEL_LEFT)  mcmd.left_rpm  = scaled;
-                if (dev == DEV_WHEEL_RIGHT) mcmd.right_rpm = scaled;
-            }
-            g_motorCmd = mcmd;
+            if (dev == DEV_WHEEL_LEFT || dev == GRP_ALL_WHEELS)
+                g_motorCmd.left_rpm  = scaled;
+            if (dev == DEV_WHEEL_RIGHT || dev == GRP_ALL_WHEELS)
+                g_motorCmd.right_rpm = scaled;
             g_motorCmdPending = true;
             return rsp;
         }
