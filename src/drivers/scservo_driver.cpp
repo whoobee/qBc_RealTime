@@ -76,14 +76,15 @@ bool SCServoDriver::readFeedback(uint8_t appl_device_id, ServoFeedback& fb) {
     uint8_t hw = _joints[idx].hw_id;
 
     // FeedBack() does a bulk read of position/speed/load/voltage/temp/current/moving
+    // into the Mem cache.  Pass ID=-1 to read from cache (no extra bus traffic).
     if (_sms.FeedBack(hw) == -1) return false;
 
-    fb.position    = _sms.ReadPos(hw);
-    fb.speed       = _sms.ReadSpeed(hw);
-    fb.load        = _sms.ReadLoad(hw);
-    fb.voltage     = _sms.ReadVoltage(hw);
-    fb.temperature = _sms.ReadTemper(hw);
-    fb.current     = _sms.ReadCurrent(hw);
-    fb.moving      = (_sms.ReadMove(hw) != 0);
+    fb.position    = _sms.ReadPos(-1);
+    fb.speed       = _sms.ReadSpeed(-1);
+    fb.load        = _sms.ReadLoad(-1);
+    fb.voltage     = _sms.ReadVoltage(-1);
+    fb.temperature = _sms.ReadTemper(-1);
+    fb.current     = _sms.ReadCurrent(-1);
+    fb.moving      = (_sms.ReadMove(-1) != 0);
     return true;
 }

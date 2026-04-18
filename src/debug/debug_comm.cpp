@@ -104,33 +104,13 @@ void debug_comm_rx_tick(HardwareSerial& port) {
     if (avail > 0) {
         s_totalBytes += avail;
 
-        // One-time raw hex dump: consume up to 32 bytes and print them.
-        // This sacrifices the first burst to show what the Pi is actually sending.
+        // Log that first data arrived (without consuming any bytes —
+        // PacketSerial needs every byte for correct COBS decoding).
         if (s_firstBytes) {
             s_firstBytes = false;
-            uint8_t sample[32];
-            int n = min(avail, 32);
-            for (int i = 0; i < n; i++) {
-                int b = port.read();
-                if (b < 0) { n = i; break; }
-                sample[i] = (uint8_t)b;
-            }
-            SERIAL_DEBUG.print(F("[RAW] First "));
-            SERIAL_DEBUG.print(n);
-            SERIAL_DEBUG.print(F(" bytes: "));
-            for (int i = 0; i < n; i++) {
-                if (sample[i] < 0x10) SERIAL_DEBUG.print('0');
-                SERIAL_DEBUG.print(sample[i], HEX);
-                SERIAL_DEBUG.print(' ');
-            }
-            SERIAL_DEBUG.println();
-            // Also print as ASCII for readability
-            SERIAL_DEBUG.print(F("[RAW] ASCII: \""));
-            for (int i = 0; i < n; i++) {
-                char c = (char)sample[i];
-                SERIAL_DEBUG.print((c >= 0x20 && c <= 0x7E) ? c : '.');
-            }
-            SERIAL_DEBUG.println('"');
+            SERIAL_DEBUG.print(F("[RAW] First data on Serial1: "));
+            SERIAL_DEBUG.print(avail);
+            SERIAL_DEBUG.println(F(" bytes available"));
         }
     }
 
