@@ -33,4 +33,5 @@ private:
     float   _speedScale;
     bool    _hardStop;
     uint8_t _bits;
+    uint8_t _prevBits;
 };

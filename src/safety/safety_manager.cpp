@@ -1,10 +1,11 @@
 #include "safety/safety_manager.h"
 #include "config/safety_config.h"
 #include "config/feature_config.h"
+#include "config/pin_config.h"
 #include <cmath>
 
 SafetyManager::SafetyManager()
-    : _speedScale(1.0f), _hardStop(false), _bits(0) {}
+    : _speedScale(1.0f), _hardStop(false), _bits(0), _prevBits(0xFF) {}
 
 void SafetyManager::evaluate(const PerceptionData& perc,
                              const IMUData& imu,
@@ -27,6 +28,59 @@ void SafetyManager::evaluate(const PerceptionData& perc,
 
     g_safetyBits = _bits;
     _hardStop = (_bits & SAFETY_ANY_CRITICAL) != 0;
+
+#if DEBUG_COMM_ENABLED
+    // Log only on state change to avoid flooding
+    uint8_t entered = _bits & ~_prevBits;
+    uint8_t cleared = _prevBits & ~_bits;
+    if (entered || cleared) {
+        if (entered & SAFETY_OBSTACLE_BIT) {
+            SERIAL_DEBUG.print(F("[SAFETY] OBSTACLE  tofL="));
+            SERIAL_DEBUG.print(perc.tof_left_mm);
+            SERIAL_DEBUG.print(F(" tofR="));
+            SERIAL_DEBUG.print(perc.tof_right_mm);
+            SERIAL_DEBUG.print(F(" tofB="));
+            SERIAL_DEBUG.print(perc.tof_back_mm);
+            SERIAL_DEBUG.print(F(" lidarF="));
+            SERIAL_DEBUG.print(perc.lidar_min_front_mm);
+            SERIAL_DEBUG.print(F(" lidarL="));
+            SERIAL_DEBUG.print(perc.lidar_min_left_mm);
+            SERIAL_DEBUG.print(F(" lidarR="));
+            SERIAL_DEBUG.print(perc.lidar_min_right_mm);
+            SERIAL_DEBUG.print(F(" lidarB="));
+            SERIAL_DEBUG.println(perc.lidar_min_back_mm);
+        }
+        if (entered & SAFETY_TILT_BIT) {
+            SERIAL_DEBUG.print(F("[SAFETY] TILT  roll="));
+            SERIAL_DEBUG.print(imu.roll_deg);
+            SERIAL_DEBUG.print(F(" pitch="));
+            SERIAL_DEBUG.println(imu.pitch_deg);
+        }
+        if (entered & SAFETY_PICKUP_BIT) {
+            SERIAL_DEBUG.print(F("[SAFETY] PICKUP  accelZ="));
+            SERIAL_DEBUG.println(imu.accel_z);
+        }
+        if (entered & SAFETY_LOWBATT_BIT) {
+            SERIAL_DEBUG.print(F("[SAFETY] LOW_BATTERY  V="));
+            SERIAL_DEBUG.println(mon.battery_voltage);
+        }
+        if (entered & SAFETY_WATCHDOG_BIT) {
+            SERIAL_DEBUG.print(F("[SAFETY] WATCHDOG  elapsed="));
+            SERIAL_DEBUG.println(millis() - mon.last_pi_heartbeat_ms);
+        }
+        if (entered & SAFETY_OVERTEMP_BIT) {
+            SERIAL_DEBUG.print(F("[SAFETY] OVERTEMP  motorL="));
+            SERIAL_DEBUG.print(mon.motor_temp_left);
+            SERIAL_DEBUG.print(F(" motorR="));
+            SERIAL_DEBUG.println(mon.motor_temp_right);
+        }
+        if (cleared) {
+            SERIAL_DEBUG.print(F("[SAFETY] CLEARED bits=0x"));
+            SERIAL_DEBUG.println(cleared, HEX);
+        }
+    }
+    _prevBits = _bits;
+#endif
 #endif
 }
 
