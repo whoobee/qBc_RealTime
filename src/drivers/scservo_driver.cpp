@@ -22,6 +22,15 @@ SCServoDriver::SCServoDriver(HardwareSerial* serial)
 void SCServoDriver::begin() {
     _serial->begin(SERVO_BAUDRATE);
     _sms.pSerial = _serial;
+
+    // Enable torque on every joint — ST3215 remembers the TORQUE_ENABLE register
+    // across power cycles, so if a servo was last stored with torque off (or was
+    // left in calibration mode), it will come up limp.  Explicitly enable torque
+    // here so the robot always boots in a "holding position" state.
+    delay(50);  // let the bus settle after Serial2 init
+    for (uint8_t i = 0; i < JOINT_COUNT; i++) {
+        _sms.EnableTorque(_joints[i].hw_id, 1);
+    }
 }
 
 // =============================================================================
