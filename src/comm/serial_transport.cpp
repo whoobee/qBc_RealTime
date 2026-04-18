@@ -28,6 +28,7 @@ void SerialTransport::onPacketReceived(const uint8_t* buf, size_t len) {
     if (!_instance) return;
 
 #if DEBUG_COMM_ENABLED
+#if DEBUG_COBS_ENABLED
     // Log every decoded COBS frame regardless of validity
     SERIAL_DEBUG.print(F("[COBS] frame len="));
     SERIAL_DEBUG.print(len);
@@ -39,6 +40,7 @@ void SerialTransport::onPacketReceived(const uint8_t* buf, size_t len) {
     }
     SERIAL_DEBUG.println();
 #endif
+#endif
 
     if (len != sizeof(RequestPacket)) return;
     if (buf[0] != PKT_REQUEST) return;
@@ -47,5 +49,9 @@ void SerialTransport::onPacketReceived(const uint8_t* buf, size_t len) {
     memcpy(&req, buf, sizeof(RequestPacket));
 
     g_rxCommandBuf.push(req);
+#if DEBUG_COMM_ENABLED
+#if DEBUG_REQUESTS_ENABLED
     debug_print_request(req);
+#endif
+#endif
 }
