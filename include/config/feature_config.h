@@ -18,7 +18,7 @@
 #define FEATURE_LIDAR_ENABLED     1   // YDLidar GS2
 
 // --- Safety ---
-#define FEATURE_SAFETY_ENABLED    1   // Master safety bypass (0 = no safety checks)
+#define FEATURE_SAFETY_ENABLED    0   // Master safety bypass (0 = no safety checks)
 
 // --- Communication ---
 #define FEATURE_PI_COMM_ENABLED   1   // Pi serial link (COBS/PacketSerial)
