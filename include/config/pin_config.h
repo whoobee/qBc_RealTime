@@ -11,10 +11,12 @@
 //   Serial3 — DDSM210 Motor R  (TX=14, RX=15)
 //   Serial4 — DDSM210 Motor L  (TX=17, RX=16)
 //   Serial7 — YDLidar GS2      (TX=29, RX=28)  — 921600 baud, 8N1
+//                              (LIDAR currently disabled — see feature_config.h)
 //
-// I2C buses (validated in qB_Test_TOF):
+// I2C buses:
 //   Wire   (SDA=18,  SCL=19)  — MPU6050 IMU at 0x68
-//   Wire2  (SDA2=25, SCL2=24) — VL53L0X TOF at 0x29 (single sensor, XSHUT = pin 32)
+//   Wire2  (SDA2=25, SCL2=24) — VL53L0X TOF array (front XSHUT = pin 32,
+//                                back sensor has no XSHUT — always on at 0x29)
 // =============================================================================
 
 // --- UART Serial Port Assignments ---
@@ -31,18 +33,30 @@
 #define I2C_BUS_TOF          Wire2     // VL53L0X (DFRobot fork hardcodes Wire2)
 
 // --- TOF Sensor XSHUT (shutdown / enable) Pins ---
-// The array driver supports up to 3 sensors on Wire2 with per-sensor XSHUT
-// control for sequential I2C address assignment. Set a slot to
-// TOF_XSHUT_NOT_WIRED (0xFF) to disable that sensor slot — it will be skipped
-// at init and readAll() will report 0 mm for that index.
+// The array driver supports up to 4 sensors on Wire2 with per-sensor XSHUT
+// control for sequential I2C address assignment.
 //
-// Current HW (qB_Test_TOF, 2026-04): only one sensor wired, on pin 32.
-// Assigned to the RIGHT slot to match the legacy schematic convention.
+// Two sentinels are recognised by the driver:
+//   TOF_XSHUT_NOT_WIRED (0xFF) — slot empty; skipped at init, readAll() = 0 mm
+//   TOF_XSHUT_NONE      (0xFE) — sensor present but XSHUT not wired to Teensy
+//                                (powered up at 0x29 from boot). The driver
+//                                must reassign its address FIRST, while every
+//                                XSHUT-controlled sensor is still held in reset.
+//
+// Current HW (2026-04-27):
+//   LEFT  — VL53L0X with XSHUT on pin 30
+//   RIGHT — VL53L0X with XSHUT on pin 32
+//   FRONT — VL53L0X with XSHUT on pin 31 (was originally wired as the "back"
+//           slot; sensor physically relocated to the front of the robot)
+//   BACK  — VL53L0X with NO XSHUT line, always live at 0x29 from boot
+//           (new sensor — driver must reassign its address FIRST)
 #define TOF_XSHUT_NOT_WIRED  0xFF
+#define TOF_XSHUT_NONE       0xFE
 
-#define PIN_TOF_XSHUT_LEFT   TOF_XSHUT_NOT_WIRED   // TOF-L (not wired yet)
-#define PIN_TOF_XSHUT_RIGHT  32                    // TOF-R (wired)
-#define PIN_TOF_XSHUT_BACK   TOF_XSHUT_NOT_WIRED   // TOF-B (not wired yet)
+#define PIN_TOF_XSHUT_LEFT   30                    // TOF-L
+#define PIN_TOF_XSHUT_RIGHT  32                    // TOF-R
+#define PIN_TOF_XSHUT_FRONT  31                    // TOF-F (legacy "back" XSHUT)
+#define PIN_TOF_XSHUT_BACK   TOF_XSHUT_NONE        // TOF-B (no XSHUT — always on)
 
 // --- Battery Monitor ADC Pins ---
 // ⚠  TODO: No ADC voltage-divider circuit visible in schematic REV 1.0.

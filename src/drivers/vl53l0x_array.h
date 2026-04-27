@@ -1,20 +1,24 @@
 #pragma once
 // =============================================================================
-// vl53l0x_array.h — 1..3 VL53L0X TOF sensors on shared Wire2 bus
+// vl53l0x_array.h — up to 4 VL53L0X TOF sensors on shared Wire2 bus
 // =============================================================================
 // Uses the local-fork DFRobot_VL53L0X library (lib/DFRobot_VL53L0X/), which is
-// hardcoded to Wire2 (Teensy SDA2=25, SCL2=24). For multi-sensor setups the
-// per-sensor XSHUT pin gives us a deterministic power-on sequence so each
-// sensor can be assigned a unique I2C address before the next is woken.
+// hardcoded to Wire2 (Teensy SDA2=25, SCL2=24).
 //
-// Init sequence (per sensor slot that has a valid XSHUT pin):
-//   1. All XSHUT pins LOW (all configured sensors held in reset)
-//   2. For slot i: XSHUT[i] HIGH → wait >1.2 ms → sensor.begin(addr[i])
-//      → the DFRobot lib reassigns the sensor to `addr[i]` so it no longer
-//      collides with others at 0x29 when we wake the next slot.
+// Init sequence:
+//   1. All slots with a valid XSHUT pin → XSHUT LOW (sensors held in reset).
+//      Any TOF_XSHUT_NONE slot stays awake at the default 0x29.
+//   2. Reassign every TOF_XSHUT_NONE slot's I2C address FIRST. This is safe
+//      because all XSHUT-controlled sensors are still in reset, so only one
+//      sensor is alive at 0x29 at a time. (In practice we expect at most
+//      one no-XSHUT sensor on the bus; multiple would collide at 0x29.)
+//   3. For each XSHUT-controlled slot: XSHUT HIGH → wait >1.2 ms →
+//      sensor.begin(addr) → the DFRobot lib reassigns the sensor away from
+//      0x29 so it no longer collides when the next slot is woken.
 //
-// Slots whose XSHUT pin is TOF_XSHUT_NOT_WIRED (0xFF) are skipped at init
-// and readAll() will report 0 mm for that index.
+// Slot sentinels (defined in pin_config.h):
+//   TOF_XSHUT_NOT_WIRED — slot empty, skipped at init, readAll() = 0 mm
+//   TOF_XSHUT_NONE      — sensor present but XSHUT not wired (always on)
 // =============================================================================
 
 #include <Arduino.h>
@@ -22,9 +26,9 @@
 
 class VL53L0XArray {
 public:
-    static constexpr uint8_t SENSOR_COUNT = 3;
+    static constexpr uint8_t SENSOR_COUNT = 4;
 
-    enum Sensor : uint8_t { LEFT = 0, RIGHT = 1, BACK = 2 };
+    enum Sensor : uint8_t { LEFT = 0, RIGHT = 1, FRONT = 2, BACK = 3 };
 
     VL53L0XArray();
 

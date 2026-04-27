@@ -67,6 +67,7 @@ struct OdometryData {
 struct PerceptionData {
     uint16_t tof_left_mm;
     uint16_t tof_right_mm;
+    uint16_t tof_front_mm;
     uint16_t tof_back_mm;
     uint16_t lidar_min_front_mm;
     uint16_t lidar_min_left_mm;
@@ -107,7 +108,7 @@ struct MonitorData {
     uint8_t motor_temp_right;
     bool sensor_ok_imu;
     bool sensor_ok_lidar;
-    bool sensor_ok_tof[3];
+    bool sensor_ok_tof[4];
     uint32_t last_pi_heartbeat_ms;
 };
 

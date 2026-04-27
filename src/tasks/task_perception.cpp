@@ -25,6 +25,7 @@ static void perceptionCallback(TaskId_t id_) {
     s_tofs.readAll(tofDist);
     g_perceptionData.tof_left_mm  = tofDist[VL53L0XArray::LEFT];
     g_perceptionData.tof_right_mm = tofDist[VL53L0XArray::RIGHT];
+    g_perceptionData.tof_front_mm = tofDist[VL53L0XArray::FRONT];
     g_perceptionData.tof_back_mm  = tofDist[VL53L0XArray::BACK];
 #endif
 
@@ -58,7 +59,8 @@ void task_perception_init() {
     s_tofs.begin();
     g_monitorData.sensor_ok_tof[0] = s_tofs.isReady(VL53L0XArray::LEFT);
     g_monitorData.sensor_ok_tof[1] = s_tofs.isReady(VL53L0XArray::RIGHT);
-    g_monitorData.sensor_ok_tof[2] = s_tofs.isReady(VL53L0XArray::BACK);
+    g_monitorData.sensor_ok_tof[2] = s_tofs.isReady(VL53L0XArray::FRONT);
+    g_monitorData.sensor_ok_tof[3] = s_tofs.isReady(VL53L0XArray::BACK);
 #endif
 
 #if FEATURE_LIDAR_ENABLED

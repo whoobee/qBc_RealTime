@@ -32,6 +32,7 @@ static const char* devName(uint8_t dev) {
         case DEV_TOF_LEFT:     return "TOF_L";
         case DEV_TOF_RIGHT:    return "TOF_R";
         case DEV_TOF_BACK:     return "TOF_B";
+        case DEV_TOF_FRONT:    return "TOF_F";
         case DEV_IMU:          return "IMU";
         case DEV_LIDAR:        return "LIDAR";
         case DEV_BATTERY:      return "BATT";

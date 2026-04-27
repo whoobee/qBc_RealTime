@@ -67,6 +67,7 @@ enum ApplDeviceID : uint8_t {
     DEV_TOF_LEFT        = 0x30,
     DEV_TOF_RIGHT       = 0x31,
     DEV_TOF_BACK        = 0x32,
+    DEV_TOF_FRONT       = 0x33,
 
     // IMU
     DEV_IMU             = 0x40,

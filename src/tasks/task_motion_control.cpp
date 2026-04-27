@@ -158,11 +158,12 @@ static ResponsePacket handleRequest(const RequestPacket& req,
         }
 
         // TOF sensors
-        if (dev >= DEV_TOF_LEFT && dev <= DEV_TOF_BACK && par == PARAM_DISTANCE_MM) {
+        if (dev >= DEV_TOF_LEFT && dev <= DEV_TOF_FRONT && par == PARAM_DISTANCE_MM) {
             float d = 0;
             if (dev == DEV_TOF_LEFT)  d = (float)g_perceptionData.tof_left_mm;
             if (dev == DEV_TOF_RIGHT) d = (float)g_perceptionData.tof_right_mm;
             if (dev == DEV_TOF_BACK)  d = (float)g_perceptionData.tof_back_mm;
+            if (dev == DEV_TOF_FRONT) d = (float)g_perceptionData.tof_front_mm;
             appl_pack_float(d, rsp.value);
             return rsp;
         }

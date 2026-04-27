@@ -15,7 +15,7 @@
 #define FEATURE_SERVOS_ENABLED    1   // ST3215 servo bus
 #define FEATURE_IMU_ENABLED       1   // BNO055 IMU
 #define FEATURE_TOF_ENABLED       1   // VL53L0X TOF array
-#define FEATURE_LIDAR_ENABLED     1   // YDLidar GS2
+#define FEATURE_LIDAR_ENABLED     0   // YDLidar GS2 (HW removed — driver kept, disabled)
 
 // --- Safety ---
 #define FEATURE_SAFETY_ENABLED    0   // Master safety bypass (0 = no safety checks)

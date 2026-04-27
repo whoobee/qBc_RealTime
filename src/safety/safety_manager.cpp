@@ -39,6 +39,8 @@ void SafetyManager::evaluate(const PerceptionData& perc,
             SERIAL_DEBUG.print(perc.tof_left_mm);
             SERIAL_DEBUG.print(F(" tofR="));
             SERIAL_DEBUG.print(perc.tof_right_mm);
+            SERIAL_DEBUG.print(F(" tofF="));
+            SERIAL_DEBUG.print(perc.tof_front_mm);
             SERIAL_DEBUG.print(F(" tofB="));
             SERIAL_DEBUG.print(perc.tof_back_mm);
             SERIAL_DEBUG.print(F(" lidarF="));
@@ -87,8 +89,9 @@ void SafetyManager::evaluate(const PerceptionData& perc,
 void SafetyManager::checkObstacles(const PerceptionData& perc) {
     uint16_t min_mm = UINT16_MAX;
 
-    uint16_t tof_vals[] = { perc.tof_left_mm, perc.tof_right_mm, perc.tof_back_mm };
-    for (int i = 0; i < 3; i++) {
+    uint16_t tof_vals[] = { perc.tof_left_mm, perc.tof_right_mm,
+                            perc.tof_front_mm, perc.tof_back_mm };
+    for (int i = 0; i < 4; i++) {
         if (tof_vals[i] > 0 && tof_vals[i] < min_mm) min_mm = tof_vals[i];
     }
 

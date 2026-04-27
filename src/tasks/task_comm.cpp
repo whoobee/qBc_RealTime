@@ -69,8 +69,11 @@ static void commTxCallback(TaskId_t id_) {
 #endif
 
 #if FEATURE_TOF_ENABLED
+    // Order matters: BACK must be sent LAST so the Pi bridge uses it as the
+    // group terminator to flush the aggregated MQTT message.
     s_transport.send(appl_make_telemetry(DEV_TOF_LEFT,  PARAM_DISTANCE_MM, (float)g_perceptionData.tof_left_mm));
     s_transport.send(appl_make_telemetry(DEV_TOF_RIGHT, PARAM_DISTANCE_MM, (float)g_perceptionData.tof_right_mm));
+    s_transport.send(appl_make_telemetry(DEV_TOF_FRONT, PARAM_DISTANCE_MM, (float)g_perceptionData.tof_front_mm));
     s_transport.send(appl_make_telemetry(DEV_TOF_BACK,  PARAM_DISTANCE_MM, (float)g_perceptionData.tof_back_mm));
 #endif
 
