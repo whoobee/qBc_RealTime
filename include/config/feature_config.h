@@ -14,8 +14,18 @@
 #define FEATURE_MOTORS_ENABLED    1   // DDSM210 wheel motors
 #define FEATURE_SERVOS_ENABLED    1   // ST3215 servo bus
 #define FEATURE_IMU_ENABLED       1   // BNO055 IMU
-#define FEATURE_TOF_ENABLED       1   // VL53L0X TOF array
+#define FEATURE_TOF_ENABLED       1   // VL53L0X TOF array master switch
 #define FEATURE_LIDAR_ENABLED     0   // YDLidar GS2 (HW removed — driver kept, disabled)
+
+// --- Per-slot TOF enables ---
+// FEATURE_TOF_ENABLED above must also be 1 for any of these to take effect.
+// Disabled slots are skipped at init (treated like an unwired slot) and their
+// readings always report 0 mm. Use to bring up sensors one at a time during
+// hardware bring-up without rewiring.
+#define FEATURE_TOF_LEFT_ENABLED  0   // pin 30 XSHUT — disabled until wiring fixed
+#define FEATURE_TOF_RIGHT_ENABLED 1   // pin 32 XSHUT
+#define FEATURE_TOF_FRONT_ENABLED 1   // pin 31 XSHUT
+#define FEATURE_TOF_BACK_ENABLED  0   // no XSHUT (always-on) — disabled until pull-up added
 
 // --- Safety ---
 #define FEATURE_SAFETY_ENABLED    0   // Master safety bypass (0 = no safety checks)

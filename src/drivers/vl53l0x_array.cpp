@@ -1,6 +1,7 @@
 #include "drivers/vl53l0x_array.h"
 #include "config/pin_config.h"
 #include "config/device_config.h"
+#include "config/feature_config.h"
 #include <Wire.h>
 
 // VL53L0X MODEL_ID register (0xC0) reads back 0xEE on every healthy chip.
@@ -41,10 +42,13 @@ static constexpr uint8_t SLOT_ADDR_BACK  = 0x32;
 static constexpr uint8_t SLOT_ADDR_FRONT = 0x33;
 
 VL53L0XArray::VL53L0XArray() {
-    _xshutPins[LEFT]  = PIN_TOF_XSHUT_LEFT;
-    _xshutPins[RIGHT] = PIN_TOF_XSHUT_RIGHT;
-    _xshutPins[FRONT] = PIN_TOF_XSHUT_FRONT;
-    _xshutPins[BACK]  = PIN_TOF_XSHUT_BACK;
+    // A disabled slot is treated as TOF_XSHUT_NOT_WIRED so the rest of the
+    // init / read path skips it and reports 0 mm — no other code paths need
+    // to care about per-slot feature flags.
+    _xshutPins[LEFT]  = FEATURE_TOF_LEFT_ENABLED  ? PIN_TOF_XSHUT_LEFT  : TOF_XSHUT_NOT_WIRED;
+    _xshutPins[RIGHT] = FEATURE_TOF_RIGHT_ENABLED ? PIN_TOF_XSHUT_RIGHT : TOF_XSHUT_NOT_WIRED;
+    _xshutPins[FRONT] = FEATURE_TOF_FRONT_ENABLED ? PIN_TOF_XSHUT_FRONT : TOF_XSHUT_NOT_WIRED;
+    _xshutPins[BACK]  = FEATURE_TOF_BACK_ENABLED  ? PIN_TOF_XSHUT_BACK  : TOF_XSHUT_NOT_WIRED;
 
     _addresses[LEFT]  = SLOT_ADDR_LEFT;
     _addresses[RIGHT] = SLOT_ADDR_RIGHT;
