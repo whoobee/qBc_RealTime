@@ -30,18 +30,8 @@
 
 #define ESD_2V8
 
-struct sVL53L0X_DetailedData_t{
-	unsigned char i2cDevAddr;
-	uint8_t mode;
-	uint8_t precision;
-	unsigned char originalData[16];
-	uint16_t ambientCount;
-	uint16_t signalCount;
-	uint16_t distance;
-	uint8_t status;
-};
-struct sVL53L0X_DetailedData_t _detailedData;
-
+// _detailedData was a file-scope global in upstream — moved into the class
+// (declared in the header) so multiple sensors no longer share state.
 
 DFRobot_VL53L0X::DFRobot_VL53L0X()
 {}
