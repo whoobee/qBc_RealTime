@@ -8,8 +8,10 @@
 // Used as a post-begin sanity check to catch silent address-assignment failures.
 // VL53L0X register addresses are 8-bit on the standard I2C interface, so we send
 // only the low byte — matching the DFRobot library's own readByteData() format.
-static constexpr uint8_t REG_MODEL_ID       = 0xC0;
-static constexpr uint8_t EXPECTED_MODEL_ID  = 0xEE;
+static constexpr uint8_t REG_MODEL_ID            = 0xC0;
+static constexpr uint8_t REG_SLAVE_DEVICE_ADDR   = 0x8A;
+static constexpr uint8_t EXPECTED_MODEL_ID       = 0xEE;
+static constexpr uint8_t VL53L0X_DEFAULT_I2C     = 0x29;
 
 static const char* slotName(uint8_t i) {
     switch (i) {
@@ -30,6 +32,46 @@ static uint8_t probeRegister(uint8_t addr, uint8_t reg) {
     if (Wire2.endTransmission(false) != 0) return 0xFF;
     if (Wire2.requestFrom((int)addr, 1) != 1) return 0xFF;
     return (uint8_t)Wire2.read();
+}
+
+// Write a 1-byte register value at `addr` on Wire2. Returns true on ACK.
+static bool writeRegister(uint8_t addr, uint8_t reg, uint8_t value) {
+    Wire2.beginTransmission(addr);
+    Wire2.write(reg);
+    Wire2.write(value);
+    return Wire2.endTransmission() == 0;
+}
+
+// Recover an always-on VL53L0X whose I2C address is "stuck" from a prior
+// Teensy boot. The sensor retains its programmed SLAVE_DEVICE_ADDRESS until
+// power is removed (XSHUT pulled or VIN cycled). If the firmware reflashes
+// without cycling sensor power, begin() will fail because the chip is not
+// at 0x29 anymore.
+//
+// Strategy: scan 0x08..0x77 for any device whose MODEL_ID register reads
+// 0xEE. If we find exactly one and it is NOT at 0x29, rewrite its
+// SLAVE_DEVICE_ADDRESS back to 0x29 so the normal DFRobot::begin(target)
+// flow can run. Returns true if a chip is now reachable at 0x29.
+static bool recoverAlwaysOnTo29() {
+    if (probeRegister(VL53L0X_DEFAULT_I2C, REG_MODEL_ID) == EXPECTED_MODEL_ID) {
+        return true;
+    }
+    uint8_t found = 0xFF;
+    for (uint8_t addr = 0x08; addr <= 0x77; addr++) {
+        if (addr == VL53L0X_DEFAULT_I2C) continue;
+        if (probeRegister(addr, REG_MODEL_ID) == EXPECTED_MODEL_ID) {
+            found = addr;
+            break;
+        }
+    }
+    if (found == 0xFF) return false;
+
+    Serial.print(F("[TOF] Always-on chip found at 0x"));
+    Serial.print(found, HEX);
+    Serial.println(F(" — renaming to 0x29"));
+    writeRegister(found, REG_SLAVE_DEVICE_ADDR, VL53L0X_DEFAULT_I2C);
+    delay(5);
+    return probeRegister(VL53L0X_DEFAULT_I2C, REG_MODEL_ID) == EXPECTED_MODEL_ID;
 }
 
 // Per-slot target 7-bit I2C addresses. Unique so sensors don't collide on
@@ -122,8 +164,17 @@ uint8_t VL53L0XArray::begin() {
     // 2) Reassign address for any always-on (TOF_XSHUT_NONE) slot first.
     //    Only one such sensor can exist on the bus at a time — multiple would
     //    collide at the default 0x29.
+    //
+    //    Always-on sensors keep their last-programmed address across Teensy
+    //    reboots (no XSHUT to reset them). Try to recover any chip stuck at a
+    //    non-default address back to 0x29 before calling DFRobot::begin().
     for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
         if (_xshutPins[i] != TOF_XSHUT_NONE) continue;
+        if (!recoverAlwaysOnTo29()) {
+            Serial.print(F("[TOF] "));
+            Serial.print(slotName(i));
+            Serial.println(F(" — no chip reachable at 0x29 (HW?)"));
+        }
         _ok[i] = initSlot(i);
         if (_ok[i]) okCount++;
     }
@@ -156,12 +207,45 @@ uint8_t VL53L0XArray::begin() {
 }
 
 // =============================================================================
+// VL53L0X RESULT_RANGE_STATUS bits [6:3] are the raw device-error code, not
+// ST's post-processed PalRangeStatus. Code 11 (RANGECOMPLETE) means ranging
+// finished normally; ST's full API then validates by checking the signal
+// rate against a threshold to derive RANGE_VALID. The DFRobot library skips
+// that validation, so we approximate it here: RANGECOMPLETE plus signal
+// count above a noise floor. Below the floor the result is dominated by
+// cross-talk / ambient noise and should not be published as a distance.
+static constexpr uint8_t  TOF_DEV_RANGECOMPLETE = 11;
+// ST spec recommends signal limit ~32 (0.25 MCPS in 9.7 fixed-point) for
+// confident measurements. The chips on this robot are delivering only sig:3–10
+// on real targets — a 10–30x sensitivity loss from spec, likely due to lens
+// contamination or hot-plug-induced chip damage. Threshold lowered so real
+// readings are not filtered out; some noise will pass through and may need
+// temporal smoothing downstream if it becomes a problem.
+static constexpr uint16_t TOF_MIN_SIGNAL_COUNT  = 2;
+
 uint16_t VL53L0XArray::readRange(Sensor idx) {
     if (idx >= SENSOR_COUNT || !_ok[idx]) return 0;
     float d = _tof[idx].getDistance();
+    if (_tof[idx].getCachedStatus() != TOF_DEV_RANGECOMPLETE) return 0;
+    if (_tof[idx].getCachedSignalCount() < TOF_MIN_SIGNAL_COUNT) return 0;
     if (d < 0.0f) return 0;
     if (d > 65535.0f) return 65535;
     return (uint16_t)d;
+}
+
+uint16_t VL53L0XArray::cachedRawRange(Sensor idx) const {
+    if (idx >= SENSOR_COUNT || !_ok[idx]) return 0;
+    return _tof[idx].getCachedRawDistance();
+}
+
+uint8_t VL53L0XArray::cachedStatus(Sensor idx) const {
+    if (idx >= SENSOR_COUNT || !_ok[idx]) return 0xFF;
+    return _tof[idx].getCachedStatus();
+}
+
+uint16_t VL53L0XArray::cachedSignal(Sensor idx) const {
+    if (idx >= SENSOR_COUNT || !_ok[idx]) return 0;
+    return _tof[idx].getCachedSignalCount();
 }
 
 void VL53L0XArray::readAll(uint16_t distances_mm[SENSOR_COUNT]) {

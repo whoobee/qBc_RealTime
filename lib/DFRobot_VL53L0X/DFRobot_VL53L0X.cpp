@@ -199,14 +199,20 @@ void DFRobot_VL53L0X::stop(){
 
 float DFRobot_VL53L0X::getDistance(){
 	readVL53L0X();
-	if(_detailedData.distance == 20)
-		_detailedData.distance = _distance;
-	else
-		_distance = _detailedData.distance;
+	// Upstream substituted a cached previous reading when raw == 20 (the
+	// chip's "measurement complete but no target" sentinel). That hid bad
+	// measurement state from the caller. Removed — caller is expected to
+	// gate by status() (0 = RANGE_VALID).
+	_distance = _detailedData.distance;
 	if(_detailedData.precision == eHigh)
 		return _detailedData.distance/4.0;
 	else
 		return _detailedData.distance;
+}
+
+uint16_t DFRobot_VL53L0X::getRawDistance(){
+	readVL53L0X();
+	return _detailedData.distance;
 }
 
 uint16_t DFRobot_VL53L0X::getAmbientCount(){

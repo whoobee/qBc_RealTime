@@ -27,6 +27,34 @@ static void perceptionCallback(TaskId_t id_) {
     g_perceptionData.tof_right_mm = tofDist[VL53L0XArray::RIGHT];
     g_perceptionData.tof_front_mm = tofDist[VL53L0XArray::FRONT];
     g_perceptionData.tof_back_mm  = tofDist[VL53L0XArray::BACK];
+
+#if DEBUG_TOF_ENABLED
+    // Throttle to ~2 Hz so we don't flood Serial at the 20 Hz read rate.
+    // Values come from the cache filled by readAll() above (one I2C read per
+    // slot). raw = chip register, mm = published distance (0 when status !=
+    // RANGE_VALID), sig = signal count, st = range status (0 = valid).
+    static uint32_t s_lastTofLog = 0;
+    uint32_t now = millis();
+    if (now - s_lastTofLog >= 500) {
+        s_lastTofLog = now;
+        const char* names[VL53L0XArray::SENSOR_COUNT] = {"L", "R", "F", "B"};
+        Serial.print(F("[TOF]"));
+        for (uint8_t i = 0; i < VL53L0XArray::SENSOR_COUNT; i++) {
+            VL53L0XArray::Sensor s = (VL53L0XArray::Sensor)i;
+            Serial.print(F(" "));
+            Serial.print(names[i]);
+            Serial.print(F("=raw:"));
+            Serial.print(s_tofs.cachedRawRange(s));
+            Serial.print(F("/mm:"));
+            Serial.print(tofDist[i]);
+            Serial.print(F("/sig:"));
+            Serial.print(s_tofs.cachedSignal(s));
+            Serial.print(F("/st:"));
+            Serial.print(s_tofs.cachedStatus(s));
+        }
+        Serial.println();
+    }
+#endif
 #endif
 
 #if FEATURE_LIDAR_ENABLED

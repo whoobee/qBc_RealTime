@@ -38,9 +38,21 @@ public:
   void start();
   void stop();
   float getDistance();
+  // Raw distance register reading (pre-calibration). In eHigh precision mode
+  // getDistance() returns this value / 4.0. Useful for debug to see what the
+  // chip is actually reporting before the library's scaling.
+  uint16_t getRawDistance();
   uint16_t getAmbientCount();
   uint16_t getSignalCount();
   uint8_t getStatus();
+
+  // Cached accessors — return values from the most recent readVL53L0X() call
+  // without issuing another I2C read. Use after getDistance() to retrieve
+  // status/signal/ambient/raw from the same measurement.
+  uint8_t  getCachedStatus()       const { return _detailedData.status; }
+  uint16_t getCachedRawDistance()  const { return _detailedData.distance; }
+  uint16_t getCachedSignalCount()  const { return _detailedData.signalCount; }
+  uint16_t getCachedAmbientCount() const { return _detailedData.ambientCount; }
 private:
 	uint16_t _distance;
 	sVL53L0X_DetailedData_t _detailedData;

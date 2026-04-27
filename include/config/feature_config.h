@@ -22,10 +22,10 @@
 // Disabled slots are skipped at init (treated like an unwired slot) and their
 // readings always report 0 mm. Use to bring up sensors one at a time during
 // hardware bring-up without rewiring.
-#define FEATURE_TOF_LEFT_ENABLED  0   // pin 30 XSHUT — disabled until wiring fixed
-#define FEATURE_TOF_RIGHT_ENABLED 1   // pin 32 XSHUT
-#define FEATURE_TOF_FRONT_ENABLED 1   // pin 31 XSHUT
-#define FEATURE_TOF_BACK_ENABLED  0   // no XSHUT (always-on) — disabled until pull-up added
+#define FEATURE_TOF_LEFT_ENABLED  0   // pin 30 XSHUT — disabled pending shell aperture redesign
+#define FEATURE_TOF_RIGHT_ENABLED 0   // pin 32 XSHUT — disabled pending shell aperture redesign
+#define FEATURE_TOF_FRONT_ENABLED 0   // pin 31 XSHUT — carrier hardware-dead, re-enable when replaced
+#define FEATURE_TOF_BACK_ENABLED  1   // no XSHUT (always-on, Pololu carrier provides 47kΩ pull-up)
 
 // --- Safety ---
 #define FEATURE_SAFETY_ENABLED    0   // Master safety bypass (0 = no safety checks)

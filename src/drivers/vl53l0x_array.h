@@ -40,6 +40,15 @@ public:
     // Single-sensor range read (mm). Returns 0 if slot not wired / not ready.
     uint16_t readRange(Sensor idx);
 
+    // Cached accessors — return values from the most recent readRange() /
+    // readAll() call without issuing additional I2C reads. Caller must have
+    // called one of those first; otherwise returns the previous measurement.
+    // In eHigh precision mode mm = raw / 4. Status 0 = RANGE_VALID; non-zero
+    // values indicate phase/signal/range errors.
+    uint16_t cachedRawRange(Sensor idx) const;
+    uint8_t  cachedStatus  (Sensor idx) const;
+    uint16_t cachedSignal  (Sensor idx) const;
+
     // Read all 3 slots into a caller-supplied array. Unwired slots → 0.
     void readAll(uint16_t distances_mm[SENSOR_COUNT]);
 
