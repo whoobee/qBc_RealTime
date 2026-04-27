@@ -1,6 +1,35 @@
 #include "drivers/vl53l0x_array.h"
 #include "config/pin_config.h"
 #include "config/device_config.h"
+#include <Wire.h>
+
+// VL53L0X MODEL_ID register (0xC0) reads back 0xEE on every healthy chip.
+// Used as a post-begin sanity check to catch silent address-assignment failures.
+// VL53L0X register addresses are 8-bit on the standard I2C interface, so we send
+// only the low byte — matching the DFRobot library's own readByteData() format.
+static constexpr uint8_t REG_MODEL_ID       = 0xC0;
+static constexpr uint8_t EXPECTED_MODEL_ID  = 0xEE;
+
+static const char* slotName(uint8_t i) {
+    switch (i) {
+        case 0: return "LEFT";
+        case 1: return "RIGHT";
+        case 2: return "FRONT";
+        case 3: return "BACK";
+        default: return "?";
+    }
+}
+
+// Raw Wire2 read of a 1-byte register from `addr`. Returns 0xFF if the device
+// did not ACK or no bytes were returned — the same sentinel a missing sensor
+// would yield, which is harmless because we only compare against 0xEE.
+static uint8_t probeRegister(uint8_t addr, uint8_t reg) {
+    Wire2.beginTransmission(addr);
+    Wire2.write(reg);
+    if (Wire2.endTransmission(false) != 0) return 0xFF;
+    if (Wire2.requestFrom((int)addr, 1) != 1) return 0xFF;
+    return (uint8_t)Wire2.read();
+}
 
 // Per-slot target 7-bit I2C addresses. Unique so sensors don't collide on
 // Wire2 once all are awake. 0x29 is the default — we avoid it for clarity.
@@ -31,6 +60,39 @@ bool VL53L0XArray::isConfigured(Sensor idx) const {
 }
 
 // =============================================================================
+// Bring up a single slot: call DFRobot begin() then verify that the sensor is
+// actually responding at the assigned address by reading MODEL_ID. Retries
+// once if the first attempt fails (covers occasional missed XSHUT timing).
+// Logs each step over USB serial so init failures are visible.
+// =============================================================================
+bool VL53L0XArray::initSlot(uint8_t i) {
+    const uint8_t addr = _addresses[i];
+    for (uint8_t attempt = 1; attempt <= 2; attempt++) {
+        _tof[i].begin(addr);
+        _tof[i].setMode(DFRobot_VL53L0X::eContinuous,
+                        DFRobot_VL53L0X::eHigh);
+        _tof[i].start();
+
+        uint8_t modelId = probeRegister(addr, REG_MODEL_ID);
+        Serial.print(F("[TOF] "));
+        Serial.print(slotName(i));
+        Serial.print(F(" addr=0x"));
+        Serial.print(addr, HEX);
+        Serial.print(F(" attempt="));
+        Serial.print(attempt);
+        Serial.print(F(" model_id=0x"));
+        Serial.println(modelId, HEX);
+
+        if (modelId == EXPECTED_MODEL_ID) return true;
+        delay(20);
+    }
+    Serial.print(F("[TOF] "));
+    Serial.print(slotName(i));
+    Serial.println(F(" — INIT FAILED (no MODEL_ID)"));
+    return false;
+}
+
+// =============================================================================
 // Power-up sequence: one sensor at a time, assign unique I2C addresses.
 //   - TOF_XSHUT_NOT_WIRED slots: skipped entirely.
 //   - TOF_XSHUT_NONE slots: reassigned FIRST (only sensor awake at 0x29 while
@@ -38,6 +100,8 @@ bool VL53L0XArray::isConfigured(Sensor idx) const {
 //   - XSHUT-controlled slots: woken one at a time, reassigned in sequence.
 // =============================================================================
 uint8_t VL53L0XArray::begin() {
+    Serial.println(F("[TOF] Initialising VL53L0X array on Wire2"));
+
     // 1) Drive every XSHUT-controlled slot LOW → those sensors held in reset.
     //    Slots marked TOF_XSHUT_NONE have no Teensy-driven XSHUT line and stay
     //    awake at 0x29 from boot — we will reassign their address first.
@@ -47,7 +111,7 @@ uint8_t VL53L0XArray::begin() {
         pinMode(pin, OUTPUT);
         digitalWriteFast(pin, LOW);
     }
-    delay(10);
+    delay(50);
 
     uint8_t okCount = 0;
 
@@ -56,12 +120,8 @@ uint8_t VL53L0XArray::begin() {
     //    collide at the default 0x29.
     for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
         if (_xshutPins[i] != TOF_XSHUT_NONE) continue;
-        _tof[i].begin(_addresses[i]);
-        _tof[i].setMode(DFRobot_VL53L0X::eContinuous,
-                        DFRobot_VL53L0X::eHigh);
-        _tof[i].start();
-        _ok[i] = true;
-        okCount++;
+        _ok[i] = initSlot(i);
+        if (_ok[i]) okCount++;
     }
 
     // 3) Wake each XSHUT-controlled sensor in sequence, reassign its address.
@@ -73,15 +133,21 @@ uint8_t VL53L0XArray::begin() {
         if (pin == TOF_XSHUT_NOT_WIRED || pin == TOF_XSHUT_NONE) continue;
 
         digitalWriteFast(pin, HIGH);
-        delay(10);    // VL53L0X boot time from XSHUT rising edge is ~1.2 ms
+        delay(50);   // VL53L0X tBOOT is ~1.2 ms; allow generous margin
 
-        _tof[i].begin(_addresses[i]);
-        _tof[i].setMode(DFRobot_VL53L0X::eContinuous,
-                        DFRobot_VL53L0X::eHigh);
-        _tof[i].start();
-        _ok[i] = true;    // DFRobot begin() is void — assume ok after XSHUT
-        okCount++;
+        _ok[i] = initSlot(i);
+        if (_ok[i]) okCount++;
     }
+
+    uint8_t expected = 0;
+    for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
+        if (_xshutPins[i] != TOF_XSHUT_NOT_WIRED) expected++;
+    }
+    Serial.print(F("[TOF] Init complete — "));
+    Serial.print(okCount);
+    Serial.print(F("/"));
+    Serial.print(expected);
+    Serial.println(F(" sensors ready"));
     return okCount;
 }
 

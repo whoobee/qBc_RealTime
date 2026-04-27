@@ -55,4 +55,9 @@ private:
     uint8_t         _xshutPins[SENSOR_COUNT];
     uint8_t         _addresses[SENSOR_COUNT];   // 7-bit, unique per slot
     bool            _ok[SENSOR_COUNT];
+
+    // Run begin()/setMode/start at the slot's assigned address, then verify
+    // by reading MODEL_ID. Retries once on failure. Returns true if the
+    // sensor responded with the expected ID (0xEE) at the new address.
+    bool initSlot(uint8_t i);
 };
