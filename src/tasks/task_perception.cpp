@@ -6,7 +6,9 @@
 
 #if FEATURE_TOF_ENABLED
 #include "drivers/vl53l0x_array.h"
+#include "drivers/tof_filter.h"
 static VL53L0XArray s_tofs;
+static TOFFilter    s_tofFilters[VL53L0XArray::SENSOR_COUNT];
 #endif
 
 #if FEATURE_LIDAR_ENABLED
@@ -21,8 +23,22 @@ static bool          s_lidarOk = false;
 #if FEATURE_TOF_ENABLED || FEATURE_LIDAR_ENABLED
 static void perceptionCallback(TaskId_t id_) {
 #if FEATURE_TOF_ENABLED
-    uint16_t tofDist[VL53L0XArray::SENSOR_COUNT];
-    s_tofs.readAll(tofDist);
+    // Per-slot: read raw sample with explicit validity, push through the
+    // median/EMA/hold/decay filter. Unconfigured slots stay at 0 so the
+    // safety manager's `> 0` skip continues to ignore them; configured
+    // slots with no current target publish TOFFilter::TOF_MAX_MM (saturates
+    // above OBSTACLE_WARNING_MM, treated as clear).
+    uint16_t tofDist[VL53L0XArray::SENSOR_COUNT] = {0};
+    for (uint8_t i = 0; i < VL53L0XArray::SENSOR_COUNT; i++) {
+        VL53L0XArray::Sensor s = (VL53L0XArray::Sensor)i;
+        if (!s_tofs.isConfigured(s)) {
+            tofDist[i] = 0;
+            continue;
+        }
+        uint16_t raw_mm = 0;
+        bool valid = s_tofs.readRangeValid(s, raw_mm);
+        tofDist[i] = s_tofFilters[i].update(valid, raw_mm);
+    }
     g_perceptionData.tof_left_mm  = tofDist[VL53L0XArray::LEFT];
     g_perceptionData.tof_right_mm = tofDist[VL53L0XArray::RIGHT];
     g_perceptionData.tof_front_mm = tofDist[VL53L0XArray::FRONT];
@@ -51,6 +67,8 @@ static void perceptionCallback(TaskId_t id_) {
             Serial.print(s_tofs.cachedSignal(s));
             Serial.print(F("/st:"));
             Serial.print(s_tofs.cachedStatus(s));
+            Serial.print(F("/cf:"));
+            Serial.print(s_tofFilters[i].confidence(), 2);
         }
         Serial.println();
     }

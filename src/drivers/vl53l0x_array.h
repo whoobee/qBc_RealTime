@@ -40,6 +40,14 @@ public:
     // Single-sensor range read (mm). Returns 0 if slot not wired / not ready.
     uint16_t readRange(Sensor idx);
 
+    // Single-sensor range read with explicit validity. Returns true on a
+    // confident measurement (status == RANGECOMPLETE, signal above floor,
+    // distance non-negative); out_mm holds the clamped distance in mm.
+    // Returns false for: unconfigured slot, status error, low signal, or
+    // sensor not ready — out_mm is left untouched. Use this when downstream
+    // code wants to distinguish "no target / out of range" from a real read.
+    bool readRangeValid(Sensor idx, uint16_t& out_mm);
+
     // Cached accessors — return values from the most recent readRange() /
     // readAll() call without issuing additional I2C reads. Caller must have
     // called one of those first; otherwise returns the previous measurement.

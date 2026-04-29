@@ -233,6 +233,17 @@ uint16_t VL53L0XArray::readRange(Sensor idx) {
     return (uint16_t)d;
 }
 
+bool VL53L0XArray::readRangeValid(Sensor idx, uint16_t& out_mm) {
+    if (idx >= SENSOR_COUNT || !_ok[idx]) return false;
+    float d = _tof[idx].getDistance();
+    if (_tof[idx].getCachedStatus() != TOF_DEV_RANGECOMPLETE) return false;
+    if (_tof[idx].getCachedSignalCount() < TOF_MIN_SIGNAL_COUNT) return false;
+    if (d < 0.0f) return false;
+    if (d > 65535.0f) d = 65535.0f;
+    out_mm = (uint16_t)d;
+    return true;
+}
+
 uint16_t VL53L0XArray::cachedRawRange(Sensor idx) const {
     if (idx >= SENSOR_COUNT || !_ok[idx]) return 0;
     return _tof[idx].getCachedRawDistance();
