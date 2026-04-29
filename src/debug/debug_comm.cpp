@@ -3,8 +3,7 @@
 #include "config/pin_config.h"
 #include "system/shared_state.h"
 
-#if DEBUG_COMM_ENABLED
-
+#if DEBUG_REQUESTS_ENABLED
 // =============================================================================
 // Name lookup tables — kept short for memory efficiency
 // =============================================================================
@@ -57,21 +56,6 @@ static const char* errName(uint8_t err) {
     }
 }
 
-// =============================================================================
-// Raw RX monitoring state
-// =============================================================================
-static uint32_t s_totalBytes    = 0;
-static uint32_t s_lastReportMs  = 0;
-static const uint32_t REPORT_INTERVAL_MS = 2000;  // print stats every 2 s
-static bool     s_firstBytes    = true;            // hex-dump first burst
-
-// =============================================================================
-void debug_comm_init() {
-    SERIAL_DEBUG.begin(DEBUG_BAUDRATE);
-    SERIAL_DEBUG.println(F("[DBG] Comm debug enabled"));
-    s_lastReportMs = millis();
-}
-
 void debug_print_request(const RequestPacket& req) {
     SERIAL_DEBUG.print(F("[RX] seq="));
     SERIAL_DEBUG.print(req.sequence);
@@ -100,6 +84,36 @@ void debug_print_request(const RequestPacket& req) {
     }
 }
 
+void debug_print_response(const ResponsePacket& rsp) {
+    // Skip telemetry to avoid flooding the debug output
+    if (rsp.pkt_type == PKT_TELEMETRY) return;
+
+    float val = appl_unpack_float(rsp.value);
+
+    SERIAL_DEBUG.print(F("[TX] seq="));
+    SERIAL_DEBUG.print(rsp.sequence);
+    SERIAL_DEBUG.print(F(" cmd="));
+    SERIAL_DEBUG.print(cmdName(rsp.command));
+    SERIAL_DEBUG.print(F(" dev="));
+    SERIAL_DEBUG.print(devName(rsp.device_id));
+    SERIAL_DEBUG.print(F(" par=0x"));
+    SERIAL_DEBUG.print(rsp.parameter, HEX);
+    SERIAL_DEBUG.print(F(" val="));
+    SERIAL_DEBUG.print(val, 2);
+    SERIAL_DEBUG.print(F(" err="));
+    SERIAL_DEBUG.println(errName(rsp.error));
+}
+#endif // DEBUG_REQUESTS_ENABLED
+
+#if DEBUG_COMM_ENABLED
+// =============================================================================
+// Raw RX monitoring state
+// =============================================================================
+static uint32_t s_totalBytes    = 0;
+static uint32_t s_lastReportMs  = 0;
+static const uint32_t REPORT_INTERVAL_MS = 2000;  // print stats every 2 s
+static bool     s_firstBytes    = true;            // hex-dump first burst
+
 void debug_comm_rx_tick(HardwareSerial& port) {
     int avail = port.available();
     if (avail > 0) {
@@ -127,25 +141,11 @@ void debug_comm_rx_tick(HardwareSerial& port) {
         SERIAL_DEBUG.println(g_txResponseBuf.count());
     }
 }
+#endif // DEBUG_COMM_ENABLED
 
-void debug_print_response(const ResponsePacket& rsp) {
-    // Skip telemetry to avoid flooding the debug output
-    if (rsp.pkt_type == PKT_TELEMETRY) return;
-
-    float val = appl_unpack_float(rsp.value);
-
-    SERIAL_DEBUG.print(F("[TX] seq="));
-    SERIAL_DEBUG.print(rsp.sequence);
-    SERIAL_DEBUG.print(F(" cmd="));
-    SERIAL_DEBUG.print(cmdName(rsp.command));
-    SERIAL_DEBUG.print(F(" dev="));
-    SERIAL_DEBUG.print(devName(rsp.device_id));
-    SERIAL_DEBUG.print(F(" par=0x"));
-    SERIAL_DEBUG.print(rsp.parameter, HEX);
-    SERIAL_DEBUG.print(F(" val="));
-    SERIAL_DEBUG.print(val, 2);
-    SERIAL_DEBUG.print(F(" err="));
-    SERIAL_DEBUG.println(errName(rsp.error));
+#if DEBUG_ANY_ENABLED
+void debug_comm_init() {
+    SERIAL_DEBUG.begin(DEBUG_BAUDRATE);
+    SERIAL_DEBUG.println(F("[DBG] Debug logging enabled"));
 }
-
 #endif

@@ -40,11 +40,9 @@ static void commTxCallback(TaskId_t id_) {
     // ---- 1. Drain the response buffer (command replies) ----
     ResponsePacket rsp;
     while (g_txResponseBuf.pop(rsp)) {
-#if DEBUG_COMM_ENABLED
 #if DEBUG_REQUESTS_ENABLED
         debug_print_response(rsp);
-#endif /* DEBUG_REQUESTS_ENABLED*/
-#endif /* DEBUG_COMM_ENABLED */
+#endif
         s_transport.send(rsp);
     }
 

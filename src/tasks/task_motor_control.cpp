@@ -28,7 +28,6 @@ static void motorControlCallback(TaskId_t id_) {
         bool okL = s_motorL.setSpeed(DDSM210_LEFT_ID,  g_motorCmd.left_rpm);
         bool okR = s_motorR.setSpeed(DDSM210_RIGHT_ID, -g_motorCmd.right_rpm);
         g_motorCmdPending = false;
-#if DEBUG_COMM_ENABLED
 #if DEBUG_MOTOR_COMMANDS_ENABLED
         SERIAL_DEBUG.print(F("[MOTOR] L="));
         SERIAL_DEBUG.print(g_motorCmd.left_rpm);
@@ -36,7 +35,8 @@ static void motorControlCallback(TaskId_t id_) {
         SERIAL_DEBUG.print(F("  R="));
         SERIAL_DEBUG.print(g_motorCmd.right_rpm);
         SERIAL_DEBUG.println(okR ? F(" OK") : F(" FAIL"));
-#endif
+#else
+        (void)okL; (void)okR;
 #endif
     }
 
@@ -60,7 +60,7 @@ static void motorControlCallback(TaskId_t id_) {
     while (g_servoCmdBuf.pop(scmd)) {
         bool ok = s_servos.setPosition(scmd.servo_appl_id,
                                        scmd.position, scmd.speed, scmd.acceleration);
-#if DEBUG_COMM_ENABLED
+#if DEBUG_SERVOS_ENABLED
         SERIAL_DEBUG.print(F("[SERVO] dev=0x"));
         SERIAL_DEBUG.print(scmd.servo_appl_id, HEX);
         SERIAL_DEBUG.print(F(" pos="));
@@ -70,6 +70,8 @@ static void motorControlCallback(TaskId_t id_) {
         SERIAL_DEBUG.print(F(" acc="));
         SERIAL_DEBUG.print(scmd.acceleration);
         SERIAL_DEBUG.println(ok ? F(" OK") : F(" FAIL"));
+#else
+        (void)ok;
 #endif
     }
 
@@ -99,14 +101,14 @@ void task_motor_control_init() {
     s_motorR.begin();
     bool modeL = s_motorL.setMode(DDSM210_LEFT_ID,  2);   // speed loop
     bool modeR = s_motorR.setMode(DDSM210_RIGHT_ID, 2);
-#if DEBUG_COMM_ENABLED
 #if DEBUG_MOTOR_COMMANDS_ENABLED
     SERIAL_DEBUG.print(F("[MOTOR] init setMode L="));
     SERIAL_DEBUG.print(modeL ? F("OK") : F("FAIL"));
     SERIAL_DEBUG.print(F("  R="));
     SERIAL_DEBUG.println(modeR ? F("OK") : F("FAIL"));
+#else
+    (void)modeL; (void)modeR;
 #endif /* DEBUG_MOTOR_COMMANDS_ENABLED */
-#endif /* DEBUG_COMM_ENABLED */
 #endif /* FEATURE_MOTORS_ENABLED */
 
 #if FEATURE_SERVOS_ENABLED

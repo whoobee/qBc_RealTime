@@ -66,9 +66,10 @@
 #define BATTERY_MONITOR_ENABLED  0   // Set to 1 when ADC hardware is present
 
 // --- Debug Logging ---
-#define DEBUG_COMM_ENABLED   1        // Set to 0 to disable comm debug output (silences SERVO/COMM/RX/TX/RAW prints)
-#define DEBUG_TOF_ENABLED    0        // Periodic TOF distance prints (throttled, ~2 Hz). Set to 1 to diagnose sensor / gating issues.
-#define DEBUG_BAUDRATE       115200   // USB Serial baud rate
+// Per-channel debug switches live in debug_config.h. SERIAL_DEBUG (above) and
+// DEBUG_BAUDRATE define the physical port; the channel flags decide what gets
+// printed. Included here so any TU pulling pin_config.h gets them transitively.
+#include "config/debug_config.h"
 
 // --- Optional: Status LED ---
 #define PIN_STATUS_LED       13   // Teensy built-in LED

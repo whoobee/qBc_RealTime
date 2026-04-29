@@ -29,7 +29,7 @@ void SafetyManager::evaluate(const PerceptionData& perc,
     g_safetyBits = _bits;
     _hardStop = (_bits & SAFETY_ANY_CRITICAL) != 0;
 
-#if DEBUG_COMM_ENABLED
+#if DEBUG_SAFETY_ENABLED
     // Log only on state change to avoid flooding
     uint8_t entered = _bits & ~_prevBits;
     uint8_t cleared = _prevBits & ~_bits;

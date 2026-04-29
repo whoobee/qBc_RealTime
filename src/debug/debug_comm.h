@@ -2,27 +2,30 @@
 // =============================================================================
 // debug_comm.h — Communication debug logging over USB Serial
 // =============================================================================
-// Prints human-readable summaries of RX requests and TX responses.
-// Controlled by DEBUG_COMM_ENABLED in pin_config.h.
+// Per-function gates match the channel that controls each output. See
+// config/debug_config.h for the channel switches.
 // =============================================================================
 
-#include "config/pin_config.h"
+#include "config/debug_config.h"
 #include "comm/appl_protocol.h"
+#include <Arduino.h>
 
-#if DEBUG_COMM_ENABLED
-
+#if DEBUG_ANY_ENABLED
 void debug_comm_init();
+#else
+inline void debug_comm_init() {}
+#endif
+
+#if DEBUG_REQUESTS_ENABLED
 void debug_print_request(const RequestPacket& req);
 void debug_print_response(const ResponsePacket& rsp);
-
-// Call from CommRX callback — monitors raw Serial1 activity
-void debug_comm_rx_tick(HardwareSerial& port);
-
 #else
-
-inline void debug_comm_init() {}
 inline void debug_print_request(const RequestPacket&) {}
 inline void debug_print_response(const ResponsePacket&) {}
-inline void debug_comm_rx_tick(HardwareSerial&) {}
+#endif
 
+#if DEBUG_COMM_ENABLED
+void debug_comm_rx_tick(HardwareSerial& port);
+#else
+inline void debug_comm_rx_tick(HardwareSerial&) {}
 #endif
