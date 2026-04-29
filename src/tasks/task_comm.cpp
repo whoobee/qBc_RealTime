@@ -1,5 +1,6 @@
 #include "tasks/task_comm.h"
 #include <HeliOS_Arduino.h>
+#include <math.h>
 #include "system/shared_state.h"
 #include "comm/serial_transport.h"
 #include "comm/appl_protocol.h"
@@ -7,6 +8,34 @@
 #include "config/device_config.h"
 #include "config/feature_config.h"
 #include "debug/debug_comm.h"
+
+// Sensor → telemetry-float helpers.
+//
+// Wire-level convention: invalid / low-confidence sensor samples are sent
+// as IEEE-754 NaN. The Pi-side bridge converts NaN → JSON `null`, so every
+// downstream consumer (navigation, behavior trees, UI) can branch on
+// "missing reading" cleanly without inventing magic-number sentinels.
+//
+// 65535 matches TOFFilter::TOF_MAX_MM (the "fully-decayed, no confident
+// target" output of the per-slot median/EMA/hold/decay pipeline).
+static constexpr uint16_t TOF_NO_TARGET_SENTINEL = 65535;
+
+static inline float tof_to_telem(uint16_t mm, bool sensor_ok) {
+    if (!sensor_ok) return NAN;
+    // 0 = slot not configured at boot; 65535 = decayed-out no-target.
+    if (mm == 0 || mm >= TOF_NO_TARGET_SENTINEL) return NAN;
+    return (float)mm;
+}
+
+static inline float imu_to_telem(float v, bool sensor_ok) {
+    return sensor_ok ? v : NAN;
+}
+
+static inline float lidar_to_telem(uint16_t mm, bool sensor_ok) {
+    if (!sensor_ok) return NAN;
+    if (mm == 0) return NAN;   // 0 = no return in this sector
+    return (float)mm;
+}
 
 #if FEATURE_PI_COMM_ENABLED
 
@@ -48,44 +77,58 @@ static void commTxCallback(TaskId_t id_) {
 
     // ---- 2. Periodic telemetry push (only for enabled modules) ----
 #if FEATURE_IMU_ENABLED
-    s_transport.send(appl_make_telemetry(DEV_SYSTEM, PARAM_ODOM_X,       g_odomData.x_mm));
-    s_transport.send(appl_make_telemetry(DEV_SYSTEM, PARAM_ODOM_Y,       g_odomData.y_mm));
-    s_transport.send(appl_make_telemetry(DEV_SYSTEM, PARAM_ODOM_HEADING, g_odomData.heading_deg));
+    {
+        // IMU validity gate: low confidence / not present → emit NaN for every
+        // IMU and odometry-derived field so consumers can detect cleanly.
+        const bool imu_ok = g_monitorData.sensor_ok_imu
+                            && g_imuData.timestamp_ms != 0;
 
-    s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_ORIENTATION_ROLL,  g_imuData.roll_deg));
-    s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_ORIENTATION_PITCH, g_imuData.pitch_deg));
-    s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_ORIENTATION_YAW,   g_imuData.yaw_deg));
+        s_transport.send(appl_make_telemetry(DEV_SYSTEM, PARAM_ODOM_X,       imu_to_telem(g_odomData.x_mm,       imu_ok)));
+        s_transport.send(appl_make_telemetry(DEV_SYSTEM, PARAM_ODOM_Y,       imu_to_telem(g_odomData.y_mm,       imu_ok)));
+        s_transport.send(appl_make_telemetry(DEV_SYSTEM, PARAM_ODOM_HEADING, imu_to_telem(g_odomData.heading_deg, imu_ok)));
 
-    // Quaternion + linear accel — terminated on ACCEL_Z so the Pi can flush as a group
-    s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_QUATERNION_W,      g_imuData.qw));
-    s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_QUATERNION_X,      g_imuData.qx));
-    s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_QUATERNION_Y,      g_imuData.qy));
-    s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_QUATERNION_Z,      g_imuData.qz));
-    s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_ACCEL_X,           g_imuData.accel_x));
-    s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_ACCEL_Y,           g_imuData.accel_y));
-    s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_ACCEL_Z,           g_imuData.accel_z));
+        s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_ORIENTATION_ROLL,  imu_to_telem(g_imuData.roll_deg,  imu_ok)));
+        s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_ORIENTATION_PITCH, imu_to_telem(g_imuData.pitch_deg, imu_ok)));
+        s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_ORIENTATION_YAW,   imu_to_telem(g_imuData.yaw_deg,   imu_ok)));
+
+        // Quaternion + linear accel — terminated on ACCEL_Z so the Pi can flush as a group
+        s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_QUATERNION_W, imu_to_telem(g_imuData.qw,      imu_ok)));
+        s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_QUATERNION_X, imu_to_telem(g_imuData.qx,      imu_ok)));
+        s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_QUATERNION_Y, imu_to_telem(g_imuData.qy,      imu_ok)));
+        s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_QUATERNION_Z, imu_to_telem(g_imuData.qz,      imu_ok)));
+        s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_ACCEL_X,      imu_to_telem(g_imuData.accel_x, imu_ok)));
+        s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_ACCEL_Y,      imu_to_telem(g_imuData.accel_y, imu_ok)));
+        s_transport.send(appl_make_telemetry(DEV_IMU, PARAM_ACCEL_Z,      imu_to_telem(g_imuData.accel_z, imu_ok)));
+    }
 #endif
 
 #if FEATURE_TOF_ENABLED
     // Order matters: BACK must be sent LAST so the Pi bridge uses it as the
     // group terminator to flush the aggregated MQTT message.
-    s_transport.send(appl_make_telemetry(DEV_TOF_LEFT,  PARAM_DISTANCE_MM, (float)g_perceptionData.tof_left_mm));
-    s_transport.send(appl_make_telemetry(DEV_TOF_RIGHT, PARAM_DISTANCE_MM, (float)g_perceptionData.tof_right_mm));
-    s_transport.send(appl_make_telemetry(DEV_TOF_FRONT, PARAM_DISTANCE_MM, (float)g_perceptionData.tof_front_mm));
-    s_transport.send(appl_make_telemetry(DEV_TOF_BACK,  PARAM_DISTANCE_MM, (float)g_perceptionData.tof_back_mm));
+    s_transport.send(appl_make_telemetry(DEV_TOF_LEFT,  PARAM_DISTANCE_MM,
+        tof_to_telem(g_perceptionData.tof_left_mm,  g_monitorData.sensor_ok_tof[0])));
+    s_transport.send(appl_make_telemetry(DEV_TOF_RIGHT, PARAM_DISTANCE_MM,
+        tof_to_telem(g_perceptionData.tof_right_mm, g_monitorData.sensor_ok_tof[1])));
+    s_transport.send(appl_make_telemetry(DEV_TOF_FRONT, PARAM_DISTANCE_MM,
+        tof_to_telem(g_perceptionData.tof_front_mm, g_monitorData.sensor_ok_tof[2])));
+    s_transport.send(appl_make_telemetry(DEV_TOF_BACK,  PARAM_DISTANCE_MM,
+        tof_to_telem(g_perceptionData.tof_back_mm,  g_monitorData.sensor_ok_tof[3])));
 #endif
 
 #if FEATURE_LIDAR_ENABLED
     // Stream a slice of the 36-bin polar histogram each tick.
     // Bridge accumulates all 36 params and publishes when the final bin arrives.
-    for (uint8_t k = 0; k < LIDAR_BINS_PER_TICK; k++) {
-        uint8_t bin = (s_lidarRRBase + k) % 36;
-        s_transport.send(appl_make_telemetry(
-            DEV_LIDAR,
-            (uint8_t)(PARAM_LIDAR_BIN_0 + bin),
-            (float)g_perceptionData.lidar_bins[bin]));
+    {
+        const bool lidar_ok = g_monitorData.sensor_ok_lidar;
+        for (uint8_t k = 0; k < LIDAR_BINS_PER_TICK; k++) {
+            uint8_t bin = (s_lidarRRBase + k) % 36;
+            s_transport.send(appl_make_telemetry(
+                DEV_LIDAR,
+                (uint8_t)(PARAM_LIDAR_BIN_0 + bin),
+                lidar_to_telem(g_perceptionData.lidar_bins[bin], lidar_ok)));
+        }
+        s_lidarRRBase = (s_lidarRRBase + LIDAR_BINS_PER_TICK) % 36;
     }
-    s_lidarRRBase = (s_lidarRRBase + LIDAR_BINS_PER_TICK) % 36;
 #endif
 
 #if FEATURE_SERVOS_ENABLED
