@@ -29,20 +29,27 @@ static void perceptionCallback(TaskId_t id_) {
     // slots with no current target publish TOFFilter::TOF_MAX_MM (saturates
     // above OBSTACLE_WARNING_MM, treated as clear).
     uint16_t tofDist[VL53L0XArray::SENSOR_COUNT] = {0};
+    bool     tofValid[VL53L0XArray::SENSOR_COUNT] = {false};
     for (uint8_t i = 0; i < VL53L0XArray::SENSOR_COUNT; i++) {
         VL53L0XArray::Sensor s = (VL53L0XArray::Sensor)i;
         if (!s_tofs.isConfigured(s)) {
             tofDist[i] = 0;
+            tofValid[i] = false;
             continue;
         }
         uint16_t raw_mm = 0;
         bool valid = s_tofs.readRangeValid(s, raw_mm);
         tofDist[i] = s_tofFilters[i].update(valid, raw_mm);
+        tofValid[i] = s_tofFilters[i].valid();
     }
-    g_perceptionData.tof_left_mm  = tofDist[VL53L0XArray::LEFT];
-    g_perceptionData.tof_right_mm = tofDist[VL53L0XArray::RIGHT];
-    g_perceptionData.tof_front_mm = tofDist[VL53L0XArray::FRONT];
-    g_perceptionData.tof_back_mm  = tofDist[VL53L0XArray::BACK];
+    g_perceptionData.tof_left_mm    = tofDist[VL53L0XArray::LEFT];
+    g_perceptionData.tof_right_mm   = tofDist[VL53L0XArray::RIGHT];
+    g_perceptionData.tof_front_mm   = tofDist[VL53L0XArray::FRONT];
+    g_perceptionData.tof_back_mm    = tofDist[VL53L0XArray::BACK];
+    g_perceptionData.tof_left_valid  = tofValid[VL53L0XArray::LEFT];
+    g_perceptionData.tof_right_valid = tofValid[VL53L0XArray::RIGHT];
+    g_perceptionData.tof_front_valid = tofValid[VL53L0XArray::FRONT];
+    g_perceptionData.tof_back_valid  = tofValid[VL53L0XArray::BACK];
 
 #if DEBUG_TOF_ENABLED
     // Throttle to ~2 Hz so we don't flood Serial at the 20 Hz read rate.

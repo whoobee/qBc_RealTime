@@ -20,10 +20,13 @@
 // target" output of the per-slot median/EMA/hold/decay pipeline).
 static constexpr uint16_t TOF_NO_TARGET_SENTINEL = 65535;
 
-static inline float tof_to_telem(uint16_t mm, bool sensor_ok) {
+static inline float tof_to_telem(uint16_t mm, bool sensor_ok, bool measurement_valid) {
     if (!sensor_ok) return NAN;
-    // 0 = slot not configured at boot; 65535 = decayed-out no-target.
+    // 0 = slot not configured at boot; 65535 = filter post-hold no-target.
     if (mm == 0 || mm >= TOF_NO_TARGET_SENTINEL) return NAN;
+    // Filter says the value is stale (hold expired with no fresh sample)
+    // — refuse to publish it as a real distance.
+    if (!measurement_valid) return NAN;
     return (float)mm;
 }
 
@@ -106,13 +109,13 @@ static void commTxCallback(TaskId_t id_) {
     // Order matters: BACK must be sent LAST so the Pi bridge uses it as the
     // group terminator to flush the aggregated MQTT message.
     s_transport.send(appl_make_telemetry(DEV_TOF_LEFT,  PARAM_DISTANCE_MM,
-        tof_to_telem(g_perceptionData.tof_left_mm,  g_monitorData.sensor_ok_tof[0])));
+        tof_to_telem(g_perceptionData.tof_left_mm,  g_monitorData.sensor_ok_tof[0], g_perceptionData.tof_left_valid)));
     s_transport.send(appl_make_telemetry(DEV_TOF_RIGHT, PARAM_DISTANCE_MM,
-        tof_to_telem(g_perceptionData.tof_right_mm, g_monitorData.sensor_ok_tof[1])));
+        tof_to_telem(g_perceptionData.tof_right_mm, g_monitorData.sensor_ok_tof[1], g_perceptionData.tof_right_valid)));
     s_transport.send(appl_make_telemetry(DEV_TOF_FRONT, PARAM_DISTANCE_MM,
-        tof_to_telem(g_perceptionData.tof_front_mm, g_monitorData.sensor_ok_tof[2])));
+        tof_to_telem(g_perceptionData.tof_front_mm, g_monitorData.sensor_ok_tof[2], g_perceptionData.tof_front_valid)));
     s_transport.send(appl_make_telemetry(DEV_TOF_BACK,  PARAM_DISTANCE_MM,
-        tof_to_telem(g_perceptionData.tof_back_mm,  g_monitorData.sensor_ok_tof[3])));
+        tof_to_telem(g_perceptionData.tof_back_mm,  g_monitorData.sensor_ok_tof[3], g_perceptionData.tof_back_valid)));
 #endif
 
 #if FEATURE_LIDAR_ENABLED

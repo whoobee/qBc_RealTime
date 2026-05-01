@@ -69,6 +69,14 @@ struct PerceptionData {
     uint16_t tof_right_mm;
     uint16_t tof_front_mm;
     uint16_t tof_back_mm;
+    // Per-channel validity flags. False once the filter's hold window has
+    // expired with no valid samples — caller (task_comm) publishes NaN so
+    // the bridge maps it to JSON null. Callers MUST NOT treat the *_mm
+    // value as a real distance when the flag is false.
+    bool     tof_left_valid;
+    bool     tof_right_valid;
+    bool     tof_front_valid;
+    bool     tof_back_valid;
     uint16_t lidar_min_front_mm;
     uint16_t lidar_min_left_mm;
     uint16_t lidar_min_right_mm;

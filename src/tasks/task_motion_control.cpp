@@ -1,5 +1,6 @@
 #include "tasks/task_motion_control.h"
 #include <HeliOS_Arduino.h>
+#include <math.h>
 #include "system/shared_state.h"
 #include "safety/safety_manager.h"
 #include "comm/appl_protocol.h"
@@ -176,13 +177,14 @@ static ResponsePacket handleRequest(const RequestPacket& req,
             return rsp;
         }
 
-        // TOF sensors
+        // TOF sensors. Stale (post-hold) channels return NaN so the
+        // requester can branch on "no measurement" cleanly.
         if (dev >= DEV_TOF_LEFT && dev <= DEV_TOF_FRONT && par == PARAM_DISTANCE_MM) {
-            float d = 0;
-            if (dev == DEV_TOF_LEFT)  d = (float)g_perceptionData.tof_left_mm;
-            if (dev == DEV_TOF_RIGHT) d = (float)g_perceptionData.tof_right_mm;
-            if (dev == DEV_TOF_BACK)  d = (float)g_perceptionData.tof_back_mm;
-            if (dev == DEV_TOF_FRONT) d = (float)g_perceptionData.tof_front_mm;
+            float d = NAN;
+            if (dev == DEV_TOF_LEFT  && g_perceptionData.tof_left_valid)  d = (float)g_perceptionData.tof_left_mm;
+            if (dev == DEV_TOF_RIGHT && g_perceptionData.tof_right_valid) d = (float)g_perceptionData.tof_right_mm;
+            if (dev == DEV_TOF_BACK  && g_perceptionData.tof_back_valid)  d = (float)g_perceptionData.tof_back_mm;
+            if (dev == DEV_TOF_FRONT && g_perceptionData.tof_front_valid) d = (float)g_perceptionData.tof_front_mm;
             appl_pack_float(d, rsp.value);
             return rsp;
         }

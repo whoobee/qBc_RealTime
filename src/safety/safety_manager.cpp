@@ -91,8 +91,14 @@ void SafetyManager::checkObstacles(const PerceptionData& perc) {
 
     uint16_t tof_vals[] = { perc.tof_left_mm, perc.tof_right_mm,
                             perc.tof_front_mm, perc.tof_back_mm };
+    bool     tof_valid[] = { perc.tof_left_valid, perc.tof_right_valid,
+                             perc.tof_front_valid, perc.tof_back_valid };
     for (int i = 0; i < 4; i++) {
-        if (tof_vals[i] > 0 && tof_vals[i] < min_mm) min_mm = tof_vals[i];
+        // Only consult channels with a real measurement — stale held
+        // values would otherwise trigger phantom obstacle stops.
+        if (tof_valid[i] && tof_vals[i] > 0 && tof_vals[i] < min_mm) {
+            min_mm = tof_vals[i];
+        }
     }
 
     uint16_t lidar_vals[] = { perc.lidar_min_front_mm, perc.lidar_min_left_mm,

@@ -3,24 +3,28 @@
 // tof_filter.h — Per-slot TOF distance filter (header-only)
 // =============================================================================
 // Pipeline applied to each new sample:
-//   median(3) → EMA(alpha) → hold last valid → linear decay to MAX
+//   median(3) → EMA(alpha) → short hold → publish "no target"
 //
 //   median(3)        kills isolated spikes / multipath outliers
 //   EMA(alpha)       smooths Gaussian jitter on valid readings
 //   hold window      keeps last valid value across brief signal dropouts
-//                    (target still there, sensor flickered)
-//   decay window     linearly walks the held value toward TOF_MAX_MM after
-//                    the hold expires — the longer we go without a valid
-//                    sample, the lower our confidence the target is still
-//                    there, until we publish "out of range" outright
+//                    (target still there, sensor flickered) — short, so
+//                    we don't republish stale noise readings as real
+//                    measurements
+//
+// After the hold expires we step directly to TOF_MAX_MM and `valid()` goes
+// false. We do NOT linearly interpolate from _lastValid → MAX: those
+// intermediate distances are physically meaningless and downstream
+// consumers (frontend / BT / nav) would treat them as real targets.
 //
 // Tuning (at the 20 Hz perception tick):
-//   HOLD_SAMPLES  = 20  →  1.0 s hold of last valid value
-//   DECAY_SAMPLES = 40  →  2.0 s linear decay to MAX
+//   HOLD_SAMPLES  = 6   →  0.3 s hold of last valid value
 //   EMA_ALPHA     = 0.3 →  ~3-sample time constant (~150 ms smoothing)
 //
 // Output sentinel: TOF_MAX_MM (65535) means "no confident target / out of
 // range" — well above OBSTACLE_WARNING_MM, so safety treats it as clear.
+// `valid()` returns false in that state so callers (e.g. task_comm) can
+// publish NaN and have the bridge map it to JSON null.
 // =============================================================================
 
 #include <Arduino.h>
@@ -29,8 +33,7 @@ class TOFFilter {
 public:
     static constexpr uint16_t TOF_MAX_MM      = 65535;
     static constexpr uint8_t  MEDIAN_WINDOW   = 3;
-    static constexpr uint16_t HOLD_SAMPLES    = 20;
-    static constexpr uint16_t DECAY_SAMPLES   = 40;
+    static constexpr uint16_t HOLD_SAMPLES    = 6;     // 0.3 s @ 20 Hz
     static constexpr float    EMA_ALPHA       = 0.3f;
 
     TOFFilter() { reset(); }
@@ -41,12 +44,14 @@ public:
         _emaInit   = false;
         _emaValue  = 0.0f;
         _lastValid = TOF_MAX_MM;
-        _missCount = HOLD_SAMPLES + DECAY_SAMPLES; // cold start = no confidence
+        _missCount = HOLD_SAMPLES + 1; // cold start = no confidence
+        _valid     = false;
     }
 
-    // Push a new sample. `valid=false` triggers hold-then-decay logic.
-    // Returns the published mm value — equal to TOF_MAX_MM once confidence
-    // has fully decayed.
+    // Push a new sample. Returns the published mm value. After the hold
+    // window expires the value steps directly to TOF_MAX_MM and `valid()`
+    // returns false — callers must treat that as "no measurement" rather
+    // than a real distance.
     uint16_t update(bool valid, uint16_t mm) {
         if (valid) {
             _medBuf[_medIdx] = mm;
@@ -64,30 +69,32 @@ public:
 
             _lastValid = (uint16_t)_emaValue;
             _missCount = 0;
+            _valid     = true;
             return _lastValid;
         }
 
-        if (_missCount < HOLD_SAMPLES + DECAY_SAMPLES) _missCount++;
+        if (_missCount <= HOLD_SAMPLES) _missCount++;
 
         if (_missCount <= HOLD_SAMPLES) {
+            // Brief dropout — keep republishing _lastValid.
+            _valid = true;
             return _lastValid;
         }
-        if (_missCount <= HOLD_SAMPLES + DECAY_SAMPLES) {
-            uint16_t into = (uint16_t)(_missCount - HOLD_SAMPLES);
-            float t = (float)into / (float)DECAY_SAMPLES;       // 0..1
-            float v = (float)_lastValid + t * ((float)TOF_MAX_MM - (float)_lastValid);
-            return (uint16_t)v;
-        }
+        // Hold expired — emit "no target" sentinel and mark invalid so
+        // task_comm publishes NaN to the bridge.
+        _valid = false;
         return TOF_MAX_MM;
     }
 
-    // 1.0 = fresh valid sample, 0.0 = fully decayed. Linear in between.
-    // Useful for debug / telemetry; not currently published.
+    // True when the most recent update() produced a real (or briefly
+    // held) measurement. False once the hold has expired.
+    bool valid() const { return _valid; }
+
+    // Coarse confidence indicator for debug / telemetry.
     float confidence() const {
-        if (_missCount <= HOLD_SAMPLES) return 1.0f;
-        if (_missCount >= HOLD_SAMPLES + DECAY_SAMPLES) return 0.0f;
-        uint16_t into = (uint16_t)(_missCount - HOLD_SAMPLES);
-        return 1.0f - (float)into / (float)DECAY_SAMPLES;
+        if (_missCount == 0) return 1.0f;
+        if (_missCount > HOLD_SAMPLES) return 0.0f;
+        return 1.0f - (float)_missCount / (float)HOLD_SAMPLES;
     }
 
 private:
@@ -111,4 +118,5 @@ private:
     float    _emaValue;
     uint16_t _lastValid;
     uint16_t _missCount;
+    bool     _valid;
 };
