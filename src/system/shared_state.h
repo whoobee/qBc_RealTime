@@ -89,9 +89,15 @@ struct IMUData {
     uint32_t timestamp_ms;
 };
 
+enum MotorCmdMode : uint8_t {
+    MOTOR_CMD_VELOCITY = 0,   // value = RPM (signed)
+    MOTOR_CMD_POSITION = 1,   // value = delta degrees of wheel rotation (signed)
+};
+
 struct MotorCommand {
-    float left_rpm;
-    float right_rpm;
+    MotorCmdMode mode;
+    float left_value;
+    float right_value;
 };
 
 struct ServoCommand {

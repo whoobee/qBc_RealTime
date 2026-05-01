@@ -64,13 +64,31 @@ static ResponsePacket handleRequest(const RequestPacket& req,
         if (dev == DEV_WHEEL_LEFT || dev == DEV_WHEEL_RIGHT ||
             dev == GRP_ALL_WHEELS) {
 
-            float scaled = val * safety.speedScaleFactor();
-
-            if (dev == DEV_WHEEL_LEFT || dev == GRP_ALL_WHEELS)
-                g_motorCmd.left_rpm  = scaled;
-            if (dev == DEV_WHEEL_RIGHT || dev == GRP_ALL_WHEELS)
-                g_motorCmd.right_rpm = scaled;
-            g_motorCmdPending = true;
+            // PARAM_VELOCITY -> RPM (safety-scaled)
+            // PARAM_POSITION -> delta degrees of wheel rotation (signed)
+            if (par == PARAM_VELOCITY) {
+                float scaled = val * safety.speedScaleFactor();
+                g_motorCmd.mode = MOTOR_CMD_VELOCITY;
+                if (dev == DEV_WHEEL_LEFT || dev == GRP_ALL_WHEELS)
+                    g_motorCmd.left_value  = scaled;
+                if (dev == DEV_WHEEL_RIGHT || dev == GRP_ALL_WHEELS)
+                    g_motorCmd.right_value = scaled;
+                g_motorCmdPending = true;
+                return rsp;
+            }
+            if (par == PARAM_POSITION) {
+                // Position-mode delta is NOT speed-scaled — safety only
+                // gates by hard-stop (already checked above) since the
+                // motor's internal closed loop sets the speed.
+                g_motorCmd.mode = MOTOR_CMD_POSITION;
+                if (dev == DEV_WHEEL_LEFT || dev == GRP_ALL_WHEELS)
+                    g_motorCmd.left_value  = val;
+                if (dev == DEV_WHEEL_RIGHT || dev == GRP_ALL_WHEELS)
+                    g_motorCmd.right_value = val;
+                g_motorCmdPending = true;
+                return rsp;
+            }
+            rsp.error = ERR_UNKNOWN_PARAM;
             return rsp;
         }
 
@@ -110,6 +128,7 @@ static ResponsePacket handleRequest(const RequestPacket& req,
             float v = 0;
             switch (par) {
                 case PARAM_VELOCITY:    v = g_motorStatus[idx].speed_rpm; break;
+                case PARAM_POSITION:    v = (float)g_motorStatus[idx].position; break;
                 case PARAM_CURRENT:     v = g_motorStatus[idx].current_a; break;
                 case PARAM_TEMPERATURE: v = (float)g_motorStatus[idx].temperature_c; break;
                 case PARAM_FAULT_CODE:  v = (float)g_motorStatus[idx].fault_code; break;
@@ -207,9 +226,9 @@ static void motionControlCallback(TaskId_t id_) {
     // ---- Evaluate safety using current shared state ----
     s_safety.evaluate(g_perceptionData, g_imuData, g_monitorData);
 
-    // If hard stop, force wheels to zero immediately
+    // If hard stop, force wheels to zero immediately (velocity mode)
     if (s_safety.isHardStop()) {
-        g_motorCmd = { 0.0f, 0.0f };
+        g_motorCmd = { MOTOR_CMD_VELOCITY, 0.0f, 0.0f };
         g_motorCmdPending = true;
     }
 
